@@ -1,5 +1,7 @@
 # 一亿 Token 清零协议
 
+在线游玩地址：[一亿 Token 清零协议](https://night741741.github.io/token-zero-protocol/)
+
 > 一间没人愿意接的机房，一份要求你烧光 1 亿 Token 的合同。
 
 纯静态的增量放置经营游戏：HTML + CSS + 原生 JavaScript，无构建、无后端、无外部依赖。打开 `index.html` 就能玩，存档保存在浏览器本地。
