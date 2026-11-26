@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>一亿 Token 清零协议</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <div class="bld">
+      <div id="cam">
+      <div id="camView">
+      <div class="floor floor-roof"></div>
+      <div class="floor floor-server"></div>
+      <div class="floor floor-ground"></div>
+      <div class="slab slab-a"></div>
+      <div class="slab slab-b"></div>
+      <div class="slab slab-c"></div>
+      <div class="wall wall-l"></div>
+      <div class="wall wall-r"></div>
+
+      <div id="sceneDetails" aria-hidden="true">
+        <div class="detail roof-seam"></div>
+        <div class="detail tank-brace"></div>
+        <svg class="detail detail-wires" viewBox="0 0 1440 900" preserveAspectRatio="none">
+          <path d="M1230 62C1265 112 1324 164 1388 214"></path>
+          <path d="M934 84C986 108 1042 118 1102 130"></path>
+        </svg>
+        <div class="detail rack-hazard"></div>
+        <div class="detail rack-cables">
+          <i style="left:377px"></i><i style="left:563px"></i><i style="left:749px"></i>
+          <i style="left:935px"></i><i style="left:1121px"></i><i style="left:1307px"></i>
+        </div>
+        <div class="detail power-patch"><span>AC · 02</span></div>
+        <div class="detail cable-run"></div>
+        <div class="detail floor-tape"><span>WORK ZONE</span></div>
+        <div class="detail paper-pile"><i></i><i></i><b></b></div>
+        <div class="detail cable-coil"></div>
+        <div class="detail dust">
+          <i style="left:352px;top:706px"></i><i style="left:708px;top:664px"></i>
+          <i style="left:902px;top:742px"></i><i style="left:1154px;top:624px"></i>
+          <i style="left:1268px;top:842px"></i>
+        </div>
+
+        <!-- 墙体结构：踢脚线 / 墙缝 / 桥架 / 管道 / 配电 / 铭牌 -->
+        <div class="detail parapet"></div>
+        <div class="detail studs studs-sv"></div>
+        <div class="detail studs studs-gd"></div>
+        <div class="detail skirt sk-roof"></div>
+        <div class="detail skirt sk-srv"></div>
+        <div class="detail skirt sk-gnd"></div>
+        <div class="detail srv-meter"><span>M-04</span></div>
+        <div class="detail roof-duct"></div>
+        <div class="detail roof-jb"><span>AC-IN</span></div>
+        <div class="detail roof-poster"><i class="t1"></i><i class="t2"></i><b>清零<br>100,000,000</b><em>协议 · 第 2 版</em></div>
+        <div class="detail tray"></div>
+        <div class="detail tray-jb j1"></div>
+        <div class="detail tray-jb j2"></div>
+        <div class="detail tray-jb j3"></div>
+        <div class="detail pipe-v"></div>
+        <div class="detail valve"></div>
+        <div class="detail pipe-h"></div>
+        <div class="detail trunk-g"></div>
+        <div class="detail trunk-drop"></div>
+        <div class="detail notice-g"><i></i><b>今日目标</b><span></span><span></span><span></span></div>
+        <div class="detail tape-x t-roof"></div>
+        <div class="detail tape-x t-srv"></div>
+        <div class="detail tape-x t-gnd"></div>
+        <svg class="detail detail-cracks" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M1246 118l14 22-9 18 20 24M1255 156l16 8M1250 140l-13 9"></path>
+          <path d="M838 252l12 18-7 14 16 20M843 284l14 6"></path>
+          <path d="M566 662l16 20-8 16 18 22 6 18M578 690l-12 9M590 712l16 4"></path>
+        </svg>
+        <div class="detail stencil fl2">FL 2</div>
+        <div class="detail stencil fl1">FL 1</div>
+        <div class="detail slab-hazard"></div>
+      </div>
+
+      <!-- 屋顶装饰 -->
+      <div class="roof-deco">
+        <i class="star" style="left:28px;top:34px"></i>
+        <i class="star" style="left:250px;top:18px"></i>
+        <i class="star" style="left:206px;top:74px;opacity:.35"></i>
+        <i class="star" style="left:76px;top:112px;opacity:.3"></i>
+        <div class="tank"></div>
+        <div class="mast"><i class="tip"></i></div>
+      </div>
+
+      <!-- 屋顶：翻牌计数板 -->
+      <div class="hs" id="hs-counter">
+        <i class="wire w1"></i><i class="wire w2"></i>
+        <div class="board">
+          <div class="plate"><span id="counterLabel">剩余 TOKEN</span><span class="tiny" id="pctTxt">清零 0.0000%</span></div>
+          <div class="flip" id="flip"></div>
+          <div class="pbar"><i id="pfill"></i></div>
+          <div class="pfoot"><span id="burnedTxt">已烧 0</span><span id="targetTxt">目标 100,000,000</span></div>
+        </div>
+      </div>
+
+      <!-- 服务器层 -->
+      <div class="hs" id="hs-orders">
+        <div class="cork">
+          <div class="ctitle">订单便签板</div>
+          <div class="receipt r1"><i class="pin"></i>标注单 <span>200 条</span><div class="ln"></div><div class="ln" style="width:70%"></div></div>
+          <div class="receipt r2"><i class="pin"></i>接单程序 <span>自动</span><div class="ln"></div><div class="ln" style="width:55%"></div></div>
+        </div>
+      </div>
+
+      <div class="vent"><span>通风井 V-02</span></div>
+      <div class="conduit"></div>
+      <i class="drop" style="left:377px"></i><i class="drop" style="left:563px"></i>
+      <i class="drop" style="left:749px"></i><i class="drop" style="left:935px"></i>
+      <i class="drop" style="left:1121px"></i><i class="drop" style="left:1307px"></i>
+
+      <div class="hs srv t-shoe" id="hs-s1" style="left:300px">
+        <div class="case"></div>
+        <div class="nt">S1 · 鞋盒</div><i class="led"></i>
+        <div class="cap">鞋盒服务器 · 4×5 · 点击进入</div>
+      </div>
+
+      <div class="hs srv t-atx" id="hs-s2" style="left:486px">
+        <div class="case"></div><i class="gpu"></i><i class="mb"></i><i class="fan"></i>
+        <div class="nt">S2 · 侧透</div><i class="led"></i>
+        <div class="cap">ATX 塔式 · 8×6</div>
+      </div>
+
+      <div class="hs srv t-atx" id="hs-s3" style="left:672px">
+        <div class="case"></div><i class="gpu"></i><i class="mb"></i><i class="fan"></i>
+        <div class="nt">S3 · 侧透</div><i class="led"></i>
+        <div class="cap">ATX 塔式 · 8×6</div>
+      </div>
+
+      <div class="hs srv t-rack" id="hs-s4" style="left:858px">
+        <div class="case"></div>
+        <div class="nt">S4 · 机架</div><i class="led"></i>
+        <div class="cap">机架式 · 12×8</div>
+      </div>
+
+      <div class="hs srv t-rack" id="hs-s5" style="left:1044px">
+        <div class="case"></div>
+        <div class="nt">S5 · 机架</div><i class="led"></i>
+        <div class="cap">机架式 · 12×8</div>
+      </div>
+
+      <div class="hs srv t-rack" id="hs-s6" style="left:1230px">
+        <div class="case"></div>
+        <div class="nt">S6 · 机架</div><i class="led"></i>
+        <div class="cap">机架式 · 12×8</div>
+      </div>
+
+      <div class="hs" id="hs-slider">
+        <div class="ruler">
+          <span class="end l">接单</span><span class="end r">训练</span>
+        </div>
+        <div class="handle" id="sliderHandle" style="left:62%"><b id="sliderLabel">接单 62%</b></div>
+      </div>
+
+      <!-- 底层 -->
+      <div class="hs" id="hs-blueprint">
+        <div class="bp">
+          <div class="roll t"></div><div class="roll b"></div>
+          <div class="ttl">天赋蓝图</div>
+          <i class="wire-l x1"></i><i class="wire-l x2"></i><i class="wire-l x3"></i><i class="wire-l x4"></i>
+          <i class="node a"></i><i class="node b"></i><i class="node c"></i><i class="node d"></i><i class="node e"></i>
+          <div class="tag">算力 / 软件 / 经济</div>
+        </div>
+      </div>
+
+      <div class="hs" id="hs-pc">
+        <div class="pc-body"></div>
+        <div class="pc-screen" id="pcScreen">
+          <canvas id="robot" width="120" height="60"></canvas>
+          <div class="scan"></div><div class="flash"></div>
+          <div class="term" id="pcTerm">&gt; AI 烧掉 0<i>_</i></div>
+        </div>
+        <div class="pc-stand"></div>
+        <div class="pc-kb"></div>
+        <div class="pc-note" id="pcNote">短按烧 Token · 长按进入</div>
+        <svg class="ringwrap" viewBox="0 0 300 220">
+          <circle cx="150" cy="91" r="78"></circle>
+        </svg>
+      </div>
+
+      <div class="hs" id="hs-rig">
+        <div class="rig-case">
+          <div class="rig-glass">
+            <i class="rig-fan"></i>
+            <div class="rig-bay rb-gpu" data-rig-slot="gpu"><em>GPU</em><b>空</b></div>
+            <div class="rig-bay rb-cpu" data-rig-slot="cpu"><em>CPU</em><b>空</b></div>
+            <div class="rig-bay rb-ram" data-rig-slot="ram0"><em>RAM</em><b>空</b></div>
+            <div class="rig-bay rb-ram" data-rig-slot="ram1"><em>RAM</em><b>空</b></div>
+            <i class="rig-led l1"></i><i class="rig-led l2"></i>
+          </div>
+          <i class="rig-foot"></i>
+          <div class="rig-note" id="rigNote">副机 · 未通电</div>
+          <div class="rig-lock" id="rigLock">第 2 幕</div>
+        </div>
+      </div>
+
+      <div class="hs" id="hs-journal">
+        <div class="nb">
+          <div class="rules"></div>
+          <div class="hand h1" id="jLine1">已烧 0 Token，<br>还剩 100,000,000。</div>
+          <div class="hand h2" id="jLine2">先点电脑，<br>让它跑起来。</div>
+          <i class="pen"></i>
+        </div>
+      </div>
+
+      <div class="hs" id="hs-shelf">
+        <div class="shelf-frame">
+          <i class="post l"></i><i class="post r"></i>
+          <i class="shelf s1"></i><i class="shelf s2"></i><i class="shelf s3"></i>
+        </div>
+        <div id="shelfPkgs"></div>
+        <div class="ship-tag" id="shipTag"></div>
+        <div class="shelf-foot"></div>
+      </div>
+
+      <!-- 夜幕与光池 -->
+      <div id="lamps"></div>
+      <svg id="veil" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="34"></feGaussianBlur>
+          </filter>
+          <mask id="nightMask" maskUnits="userSpaceOnUse" x="0" y="0" width="1440" height="900">
+            <rect x="0" y="0" width="1440" height="900" fill="#ffffff"></rect>
+            <g id="ambientHoles" fill="#000000"></g>
+            <g id="holes" filter="url(#soft)" fill="#000000"></g>
+          </mask>
+        </defs>
+        <rect x="0" y="0" width="1440" height="900" fill="#0B0A07" opacity="0.92" mask="url(#nightMask)"></rect>
+      </svg>
+
+      <div id="stamps"></div>
+      </div><!-- /#camView -->
+      </div><!-- /#cam -->
+
+      <!-- HUD -->
+      <div id="hud">
+        <div class="hud-it"><span>资金</span><b id="hudMoney">¥0</b></div>
+        <div class="hud-it"><span>数据</span><b id="hudData">0 GB</b></div>
+        <div class="hud-it"><span>算力</span><b id="hudCompute">0/s</b></div>
+        <div class="hud-it"><span>AI</span><b id="hudAi">×1</b></div>
+        <div class="hud-it"><span>自动</span><b id="hudAuto">0/s</b></div>
+        <div class="hud-it hud-rate" title="最近 1 秒平均消耗，含点击与被动燃烧"><span>消耗</span><b id="hudBurnRate">0/s</b></div>
+        <div class="hud-it"><span>天赋点</span><b id="hudTalent">0 / 12</b></div>
+        <div class="hud-title"><span id="hudTitleText">一亿 Token 清零协议</span><i id="hudAct">第 1 幕 · 底层单机</i></div>
+        <div class="hud-right">
+          <button class="hbtn" id="hMute">声音 开</button>
+          <button class="hbtn" id="hSave">存</button>
+          <button class="hbtn" id="hReset">重开</button>
+        </div>
+      </div>
+
+      <div class="act-progress" id="actProgress" role="progressbar" aria-label="当前幕 Token 进度" aria-valuemin="0" aria-valuemax="1000000" aria-valuenow="0">
+        <div class="ap-head"><span id="actNext">第 1 幕 · 底层单机</span><b id="actProgressText">0 / 100 万 Token</b></div>
+        <div class="ap-goal"><span id="actGoal">目标：冲线并拆开 RTX 3060</span><em id="actGift">下一份 10 万</em></div>
+        <div class="ap-track"><i id="actProgressFill"></i></div>
+        <div class="ap-news hidden" id="worldNews">
+          <b id="wnName"></b><span id="wnBrief"></span><em id="wnTime"></em>
+        </div>
+      </div>
+
+      <aside id="pending" aria-label="进行中任务" aria-hidden="true">
+        <div class="pd-head"><span>进行中</span><b id="pdCount">0 项</b></div>
+        <div class="pd-list" id="pdList"></div>
+      </aside>
+
+      <div id="tip"></div>
+      <div id="toast"></div>
+
+      <!-- 新手纸签 -->
+      <div id="coach" class="hidden">
+        <i class="c-tape"></i>
+        <div class="c-head"><span id="coachStep">新手 1 / 3</span><button id="coachOk">知道了</button></div>
+        <div class="c-title" id="coachTitle">先点两下</div>
+        <div class="c-text" id="coachText"></div>
+      </div>
+
+      <!-- 竖屏快捷跳转 -->
+      <div id="mNav">
+        <button data-jump="pc">电脑</button>
+        <button data-jump="rig">副机</button>
+        <button data-jump="server">服务器</button>
+        <button data-jump="roof">屋顶</button>
+        <button data-jump="blueprint">蓝图</button>
+        <button data-jump="shelf">快递</button>
+        <button data-jump="journal">手记</button>
+      </div>
+    </div>
+
+    <!-- 内部页 -->
+    <div id="pageWrap">
+      <div id="pageStage">
+        <section class="page" id="page-hub">
+          <div class="phead">
+            <button class="pback" data-back>返回<span class="esc"> · ESC</span></button>
+            <div class="pttl">老电脑 · 桌面</div>
+            <div class="phint" id="hubHint">代理 ×1 · 点击 +300 Token · 自动烧速 0/s</div>
+            <div class="pchips"><span class="chip" id="hubChip1">第 1 幕</span><span class="chip" id="hubChip2">快递 8 秒送达</span></div>
+          </div>
+          <div class="crt">
+            <div class="wallmark">C:\AI\RUNNING</div>
+
+            <div class="desk-icons" id="deskIcons"></div>
+
+            <div class="win" id="win-shop" style="left:152px;top:28px;width:900px;height:560px">
+              <div class="tb"><span>商店 · 硬件目录</span><span class="dots"><i></i><i></i><i></i><button class="x" title="关闭">×</button></span></div>
+              <div class="wbody scroll" id="shopBody"></div>
+              <div class="wfoot" id="shopFoot">实体硬件走快递 · 到货拆箱后进公共仓库</div>
+            </div>
+
+            <div class="win" id="win-apps" style="left:152px;top:28px;width:900px;height:560px">
+              <div class="tb"><span>应用市场</span><span class="dots"><i></i><i></i><i></i><button class="x" title="关闭">×</button></span></div>
+              <div class="wbody scroll" id="appBody"></div>
+              <div class="wfoot">模型本体不售卖 · 这里部署的是执行代理 / 运行时授权</div>
+            </div>
+
+            <div class="win" id="win-orders" style="left:152px;top:18px;width:900px;height:560px">
+              <div class="tb"><span>订单 · 接单板</span><span class="tb-right"><button type="button" class="tb-help" data-help="act2" title="查看订单、数据与软件说明">说明</button><span class="dots"><i></i><i></i><i></i><button class="x" title="关闭">×</button></span></span></div>
+              <div class="wbody scroll" id="orderBody"></div>
+              <div class="wfoot" id="orderFoot">在板 0 / 4 · 接单后按接单算力推进</div>
+            </div>
+
+            <div class="win" id="win-software" style="left:152px;top:28px;width:900px;height:560px">
+              <div class="tb"><span>软件 · 开发台</span><span class="tb-right"><button type="button" class="tb-help" data-help="act2" title="查看订单、数据与软件说明">说明</button><span class="dots"><i></i><i></i><i></i><button class="x" title="关闭">×</button></span></span></div>
+              <div class="wbody scroll" id="swBody"></div>
+              <div class="wfoot" id="swFoot">开发点挂机增长 · 手写 +2 · L3 起可让 AI 代写</div>
+            </div>
+
+            <div class="win" id="win-api" style="left:152px;top:28px;width:900px;height:560px">
+              <div class="tb"><span>API 服务 · 开放平台</span><span class="tb-right"><button type="button" class="tb-help" data-help="api" title="查看开放 API 说明">说明</button><span class="dots"><i></i><i></i><i></i><button class="x" title="关闭">×</button></span></span></div>
+              <div class="wbody scroll" id="apiBody"></div>
+              <div class="wfoot" id="apiFoot">每个请求消耗 40 Token · 收入按实际燃烧结算</div>
+            </div>
+
+            <div class="win" id="win-news" style="left:152px;top:28px;width:900px;height:560px">
+              <div class="tb"><span>机房日报 · 世界快讯</span><span class="dots"><i></i><i></i><i></i><button class="x" title="关闭">×</button></span></div>
+              <div class="wbody scroll" id="newsBody"></div>
+              <div class="wfoot" id="newsFoot">世界事件、协议与模型动向 · 打开后标记已读</div>
+            </div>
+
+            <div class="win" id="win-opinion" style="left:152px;top:28px;width:900px;height:560px">
+              <div class="tb"><span>舆论 · 公开评价</span><span class="dots"><i></i><i></i><i></i><button class="x" title="关闭">×</button></span></div>
+              <div class="wbody scroll" id="opinionBody"></div>
+              <div class="wfoot" id="opinionFoot">模型等级、API 稳定性与世界事件都会影响口碑</div>
+            </div>
+
+            <div class="sticky" id="goalNote" style="left:800px;top:500px;width:336px">
+              <i class="tape"></i>
+              <b>本幕目标</b>
+              <div>烧到 100 万 Token 解锁 RTX 3060。<br>攒 ¥4,000 下单，到货拆箱——<br>老电脑插不下它，但 S1 可以。</div>
+            </div>
+            <div class="sticky" style="left:164px;top:420px;width:300px;transform:rotate(1deg)">
+              <i class="tape"></i>
+              <b>操作提示</b>
+              <div>短按电脑：AI 跑一步，烧 Token。<br>长按 600ms：进这台电脑。<br><span class="esc-only">窗口开着时，ESC 先关窗口。</span><span class="mob-only">窗口开着时，点右上角 × 关窗口。</span><br><span class="esc-only">滚轮缩放 · WASD 平移 · 双击空白复位。</span></div>
+            </div>
+
+            <div class="taskbar">
+              <span>AI-OS 0.9</span>
+              <span id="tbMem">内存 ×1</span>
+              <span id="tbProc">代理 1</span>
+              <span id="tbBurn">自动 0/s</span>
+              <span id="tbMine">挖矿 ¥0/s</span>
+              <span class="tsp" id="tbToken">剩余 100,000,000</span>
+              <button class="tbtn hidden" id="tbAi" title="停止/恢复 AI 自动买硬件与自动装机">AI托管 开</button>
+              <button class="tbtn" id="tbBack">回楼体</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" id="page-srv">
+          <div class="phead">
+            <button class="pback" data-back>返回<span class="esc"> · ESC</span></button>
+            <div class="pttl" id="srvTitle">S1 · 鞋盒服务器</div>
+            <div class="phint" id="srvHint">4×5 · 装机 0 格 · 算力 0/s</div>
+            <div class="pchips"><span class="chip" id="srvChip1">第 2 幕 · 机位 1</span><span class="chip" id="srvChip2">运转正常</span></div>
+          </div>
+          <div class="srvbg">
+            <div class="leftcol">
+              <div class="gridcard">
+                <div class="gt"><span id="gridName">机箱内部 · 鞋盒 4×5</span><span id="gridStat">已装机 0 / 20 格 · 公共仓库 0</span></div>
+                <div class="case-stage">
+                  <div class="case-wrap tier0" id="case-wrap">
+                    <div class="case-label" id="case-label">鞋盒 · S1</div>
+                    <i class="tape"></i>
+                    <canvas id="grid-canvas"></canvas>
+                    <div class="card-layer" id="card-layer"></div>
+                    <div class="psu-edge"></div>
+                  </div>
+                  <div class="recycle-bin" id="recycle-bin" role="note" aria-label="硬件回收投放区：拖入普通硬件，退还五成">
+                    <i class="recycle-icon" aria-hidden="true"></i>
+                    <b>回收</b>
+                    <span>拖到这里</span>
+                    <small id="recycleNote">退 50%</small>
+                  </div>
+                </div>
+                <div class="legend">
+                  <span><i style="background:#C44536"></i>显卡</span>
+                  <span><i style="background:#B08D57"></i>CPU</span>
+                  <span><i style="background:#4E7A4E"></i>内存</span>
+                  <span><i style="background:#D9A441"></i>电源</span>
+                  <span><i style="background:#8B7F66"></i>风扇</span>
+                </div>
+              </div>
+              <div class="worknotes">
+                <h4>装机手记</h4>
+                <div class="wl">
+                  <span>商店下单 → 拆箱进公共仓库 → 拖进任意机箱</span>
+                  <span>红斜线是热区，叠卡降频；风扇 / 水冷给四周降温</span>
+                  <span>显卡邻接 CPU / 内存有加成</span>
+                  <span>电源必须贴底边，才算有效供电</span>
+                  <span>普通硬件拖进机箱旁回收区，退五成；自研 NPU 不可回收</span>
+                  <span id="workNoteCompute">有效算力 0 /s（全体 ×优化器）</span>
+                </div>
+              </div>
+              <div class="traybox" id="tray">
+                <h4>公共仓库 · 待装 <b id="trayCount">0</b></h4>
+                <div class="tray-items" id="tray-items"></div>
+                <div class="trayhint">拆箱后进这里。拖进机箱装上，拖进机箱旁回收区退五成。</div>
+              </div>
+            </div>
+            <div class="memo">
+              <h4>机位备忘 · 手写</h4>
+              <div class="kv"><span>型号</span><b id="memoModel">S1 · 鞋盒服务器</b></div>
+              <div class="kv"><span>网格</span><b id="memoGrid">4 × 5</b></div>
+              <div class="kv"><span>被动散热</span><b id="memoCool">40</b></div>
+              <div class="kv"><span>磁盘</span><b id="memoDisk">板载 500G + 0G</b></div>
+              <div class="kv"><span>功耗</span><b id="memoPower">0 W / 0 W</b></div>
+              <div class="kv"><span>带宽 / 算力</span><b id="memoBand">0 / 0</b></div>
+              <div class="kv"><span>有效算力</span><b id="memoCompute">0 /s</b></div>
+              <div class="kv"><span>瓶颈</span><b id="memoBottleneck">无</b></div>
+              <div class="formula">有效算力 = min(算力, 带宽)<br>× 供电系数 × 散热系数</div>
+              <div class="bstamp" id="memoStamp">第 2 幕 · 运转中</div>
+              <h4 class="sl">机位</h4>
+              <div class="srvlist" id="srvList"></div>
+            </div>
+            <div class="nextcard">
+              <h4>下一台</h4>
+              <div class="nk" id="nextTitle">S2 · 侧透 ATX</div>
+              <div class="nsub" id="nextSub">L1 解锁 · ¥15,000 · 8×6 网格</div>
+              <button class="buy" id="nextBuy">开新机位</button>
+            </div>
+            <div class="srvlock" id="srvLock">设备还没点亮。拆开 RTX 3060，第 2 幕的机位才会开门。</div>
+          </div>
+        </section>
+
+        <section class="page" id="page-rig">
+          <div class="phead">
+            <button class="pback" data-back>返回<span class="esc"> · ESC</span></button>
+            <div class="pttl">副机 · 燃烧机箱</div>
+            <div class="phint" id="rigHint">把仓库里的实体显卡、CPU、内存拖进对应槽位，提高每次点击的燃烧量</div>
+            <div class="pchips">
+              <span class="chip" id="rigChip1">点击 +0 / 次</span>
+              <span class="chip" id="rigChip2">已装 0 / 4</span>
+            </div>
+          </div>
+          <div class="rigbg">
+            <div class="rig-main">
+              <div class="rigpage-case">
+                <i class="tape"></i>
+                <div class="rpc-head">
+                  <span>副机内部 · 燃烧回路</span>
+                  <b id="rigTotal">点击 +0</b>
+                </div>
+                <div class="rpc-body">
+                  <i class="rpc-fan"></i>
+                  <button type="button" class="rigcard rb-gpu" data-rig-slot="gpu">
+                    <span>显卡槽</span><b>空</b><em>+0 / 次</em><i>点击槽位取下</i>
+                  </button>
+                  <button type="button" class="rigcard rb-cpu" data-rig-slot="cpu">
+                    <span>CPU 槽</span><b>空</b><em>+0 / 次</em><i>点击槽位取下</i>
+                  </button>
+                  <button type="button" class="rigcard rb-ram" data-rig-slot="ram0">
+                    <span>内存槽 1</span><b>空</b><em>+0 / 次</em><i>点击槽位取下</i>
+                  </button>
+                  <button type="button" class="rigcard rb-ram" data-rig-slot="ram1">
+                    <span>内存槽 2</span><b>空</b><em>+0 / 次</em><i>点击槽位取下</i>
+                  </button>
+                  <i class="rpc-led l1"></i><i class="rpc-led l2"></i>
+                </div>
+              </div>
+              <div class="rig-formula">
+                <b>点击公式</b>
+                <span>（基础点击 + 副机加成）× 点击天赋倍率</span>
+                <em>副机加成 = 显卡 / CPU 算力 ×16 + 内存带宽 ×1</em>
+              </div>
+              <div class="rig-note-card">
+                装进副机的硬件不再参与任何服务器算力。要用 S1 里的件，先在机位页把它拆回公共仓库。自动 AI 燃烧仍按原速率，不享受副机加成。
+              </div>
+            </div>
+            <div class="rig-side">
+              <div class="rig-sidehead">
+                <h4>公共仓库 · 可装部件</h4>
+                <b id="rigWhCount">0</b>
+              </div>
+              <div class="rig-empty" id="rigEmpty">仓库里没有可装的显卡、CPU 或内存。去商店下单，拆箱后再来。</div>
+              <div class="rig-parts" id="rigParts"></div>
+              <div class="rig-tip">拖动卡片到槽位安装 · 点击卡片也可安装 · 点击槽位取下 · 旧挡位不会自动替换</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" id="page-tal">
+          <div class="phead">
+            <button class="pback" data-back>返回<span class="esc"> · ESC</span></button>
+            <div class="pttl">天赋蓝图</div>
+            <div class="phint">前期 12 点 · 续签后再给 12 点 · 24 点恰好点满八条树</div>
+            <div class="pchips"><span class="chip" id="talChip1">可用 0 / 12</span><span class="chip" id="talChip2">下一里程碑 5 万</span><span class="chip">盖章即生效</span></div>
+          </div>
+          <div class="talents">
+            <div class="bpttl">TALENT_GRAPH · 天赋蓝图<small>BLUEPRINT / 前期四系 · 续签四系 · 纯增益 · 无失败</small><span class="trecommend">前期推荐点击系：先 ×2，再 ×4，最后自动点击</span></div>
+            <div class="tal-tabs">
+              <button type="button" class="tal-tab on" data-tal-tab="early">前期蓝图<small>烧 Token · 12 点</small></button>
+              <button type="button" class="tal-tab locked" data-tal-tab="late">续签蓝图<small>百亿后解锁 · 12 点</small></button>
+            </div>
+            <div class="tpts" id="talPts">可用天赋点 0</div>
+            <div class="tcols tgraph" id="talCols"></div>
+            <div class="tnote">每系按顺序点亮 · 点一下盖章生效 · 沙盒里也能全点满</div>
+            <div class="bpgridtag">GRID 24PX · LINK 12 · READ ONLY</div>
+            <div class="tmlist" id="talMilestones"></div>
+          </div>
+        </section>
+
+        <section class="page" id="page-journal">
+          <div class="phead">
+            <button class="pback" data-back>返回<span class="esc"> · ESC</span></button>
+            <div class="pttl">清零手记</div>
+            <div class="phint">里程碑、下载、到货都写在这里</div>
+            <div class="pchips"><span class="chip" id="jChip">第 1 / 1 页</span></div>
+          </div>
+          <div class="jbg">
+            <div class="jbook">
+              <div class="jttl" id="jTitle">清零手记 · 第 1 幕</div>
+              <div id="journalLogs"></div>
+              <div class="jpager">
+                <button class="chipbtn" id="jPrev">上一页</button>
+                <span id="jPage">1 / 1</span>
+                <button class="chipbtn" id="jNext">下一页</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div id="preview-rect" class="hidden"></div>
+      </div>
+      <button id="mPageBack">返回</button>
+    </div>
+
+    <!-- 开场合同 / 一次性补给 -->
+    <div id="paperModal" class="paper-modal hidden" role="dialog" aria-modal="true" aria-labelledby="pmTitle" aria-hidden="true">
+      <div class="pm-card">
+        <i class="pm-tape"></i>
+        <div class="pm-kicker" id="pmKicker">清零协议 · 入职须知</div>
+        <div class="pm-stamp" id="pmStamp">约</div>
+        <h2 id="pmTitle">一亿 Token 清零协议</h2>
+        <div class="pm-body" id="pmBody"></div>
+        <div class="pm-name hidden" id="pmName">
+          <label for="pmNameInput">模型名字</label>
+          <div class="pm-name-row">
+            <input id="pmNameInput" type="text" maxlength="10" autocomplete="off" spellcheck="false" placeholder="CLR-01">
+            <span>最多 10 字</span>
+          </div>
+          <div class="pm-name-chips" id="pmNameChips"></div>
+        </div>
+        <div class="pm-item hidden" id="pmItem"></div>
+        <div class="pm-foot">
+          <span class="pm-page" id="pmPage"></span>
+          <div class="pm-actions">
+            <button type="button" class="pm-btn ghost" id="pmSkip">跳过故事</button>
+            <button type="button" class="pm-btn" id="pmNext">签下协议，开始</button>
+            <button type="button" class="pm-btn hidden" id="pmClose">收下</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 终局三选一（挂在舞台层，内部页关着也能弹） -->
+    <div id="ending" class="ending hidden">
+      <div class="en-card">
+        <div class="en-tag" id="enTag">清零协议 · 100,000,000 / 100,000,000</div>
+        <h2 id="enTitle">一亿 Token 已烧尽</h2>
+        <p id="enText">它把最后一份算力用完，停下来等你决定接下来怎么办。</p>
+        <div class="en-list" id="enChoices"></div>
+        <div class="en-foot" id="enFoot">三个选择都通往结局 · 沙盒保留进度</div>
+        <button class="en-restart hidden" id="enRestart">重新开始</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="portrait-note">竖屏排版在 M4 · 当前为整体缩放</div>
+</div>
+
+<script src="js/content.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/stage.js"></script>
+<script src="js/drag.js"></script>
+<script src="js/hub.js"></script>
+<script src="js/rig.js"></script>
+<script src="js/delivery.js"></script>
+<script src="js/pending.js"></script>
+<script src="js/modal.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
