@@ -1,6 +1,6 @@
-# 一亿 Token 清零协议
+# 百万亿 Token 清零协议
 
-在线游玩地址：[一亿 Token 清零协议](https://night741741.github.io/token-zero-protocol/)
+在线游玩地址：[百万亿 Token 清零协议](https://night741741.github.io/token-zero-protocol/)
 
 > 一间没人愿意接的机房，一份要求你烧光 1 亿 Token 的合同。
 
