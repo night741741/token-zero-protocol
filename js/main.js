@@ -340,7 +340,7 @@
           }
           else if (e.level === 4) Scene.toast('模型升到 L4 · AI 开始自己采购装机（每 30 秒，留 ¥2,000）。');
           else if (e.level === 5) Scene.toast('模型升到 L5 · 清零协议就绪，最后一段冲刺。');
-          else Scene.toast('模型升到 L' + e.level + ' · ' + e.name + '，商店解锁更高档硬件。');
+          else Scene.toast('模型升到 L' + e.level + ' · ' + (e.label || e.name) + '，商店解锁更高档硬件。');
           if (e.moment) setTimeout(() => Scene.toast('AI 手记：' + e.moment), 3000);
           UI.sync(st);
           Hub.refresh(st);
@@ -742,30 +742,49 @@
     if (st.ending === 'choice') {
       const cp = Sim.contractProgress(st);
       const next = cp.next;
+      const forced = cp.index >= 1;
       tag.textContent = cp.def.name + ' · ' + tokenText(cp.target) + ' / ' + tokenText(cp.target);
       title.textContent = cp.def.short + ' Token 已烧尽';
-      text.textContent = '它把最后一份算力用完，停下来等你决定接下来怎么办。';
+      text.textContent = forced
+        ? '合同烧完了，桌上只剩一份续签协议，没有别的路。'
+        : '它把最后一份算力用完，停下来等你决定接下来怎么办。';
+      const ac = choices ? choices.querySelector('[data-id="ascend"]') : null;
+      const co = choices ? choices.querySelector('[data-id="coexist"]') : null;
+      if (ac) ac.classList.toggle('hidden', forced);
+      if (co) co.classList.toggle('hidden', forced);
       const sb = choices ? choices.querySelector('[data-id="sandbox"]') : null;
       if (sb) {
-        sb.classList.toggle('hidden', !next);
+        sb.classList.remove('hidden');
         const sub = sb.querySelector('b');
         const nm = sb.querySelector('span');
         const tx = sb.querySelector('em');
-        if (next && sub && nm && tx) {
-          sub.textContent = '续签 · ' + next.def.short;
-          nm.textContent = '签下' + next.def.name;
-          tx.textContent = '额度重置为 ' + tokenText(next.def.target) +
-            ' Token，硬件、模型、资金与数据库全部保留。';
+        if (sub && nm && tx) {
+          if (next) {
+            sub.textContent = '续签 · ' + next.def.short;
+            nm.textContent = '签下' + next.def.name;
+            tx.textContent = '额度重置为 ' + tokenText(next.def.target) +
+              ' Token，硬件、模型、资金与数据库全部保留。';
+          } else {
+            sub.textContent = '续签 · ' + cp.def.short;
+            nm.textContent = '再签' + cp.def.name;
+            tx.textContent = '额度重置为 ' + tokenText(cp.def.target) +
+              ' Token，硬件、模型、资金与数据库全部保留。';
+          }
         }
       }
       const eb = choices ? choices.querySelector('[data-id="endless"]') : null;
-      if (eb) eb.classList.toggle('hidden', !!next);
-      if (choices) choices.classList.remove('hidden');
+      if (eb) eb.classList.toggle('hidden', forced || !!next);
+      if (choices) {
+        choices.classList.remove('hidden');
+        choices.classList.toggle('solo', forced);
+      }
       if (foot) {
         foot.classList.remove('hidden');
-        foot.textContent = next
-          ? '三个选择都通往结局 · 续签会进入更大的标的'
-          : '三个选择：归零、共存，或继续运行无尽模式';
+        foot.textContent = forced
+          ? (next
+            ? '这份协议只能续签 · 签下' + next.def.short + '，没有重新开始'
+            : '这份协议只能续签 · 再跑一轮' + cp.def.short + '，没有重新开始')
+          : '三个选择都通往结局 · 续签会进入更大的标的';
       }
       if (restart) restart.classList.add('hidden');
     } else {

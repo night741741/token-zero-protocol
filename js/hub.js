@@ -1174,8 +1174,9 @@
         api.acceptOrder(o.id);
       });
       buy.appendChild(btn);
-      const share = Math.max(1, root.Sim.orderCompute(st) / Math.max(1, st.active.length + 1));
-      osub.textContent = '工作量 ' + o.workload + ' · 约 ' + Math.ceil(o.workload / share) + ' 秒';
+      const share = root.Sim.orderPreviewShare(st);
+      osub.textContent = '工作量 ' + o.workload + ' · ' +
+        (share > 0 ? '约 ' + Math.ceil(o.workload / share) + ' 秒' : '暂无算力');
     }
     el.appendChild(buy);
     return el;
@@ -1300,7 +1301,7 @@
       ['甲方', info.client],
       ['交接', info.contact],
       ['工作量', String(info.workload)],
-      ['预计耗时', info.eta + ' 秒'],
+      ['预计耗时', info.eta > 0 ? info.eta + ' 秒' : '暂无算力'],
       ['报酬', orderNumText(o) + (o.dataReward ? ' 数据' : '')],
     ].forEach(pair => {
       const item = document.createElement('div');
@@ -2502,7 +2503,7 @@
     const status = !on ? '已暂停' : (rate > 0 ? '运行中 · ' + rate.toFixed(1) + ' 单/s' : '等待算力');
 
     if (apiRefs.title) setText(apiRefs.title, '模型 API · ' + def.name, 'apiTitle');
-    if (apiRefs.status) setText(apiRefs.status, status + ' · ' + C.MODEL_LEVELS[lvl].short + ' · ' + C.MODEL_LEVELS[lvl].name, 'apiStatus');
+    if (apiRefs.status) setText(apiRefs.status, status + ' · ' + C.MODEL_LEVELS[lvl].short + ' · ' + root.Sim.levelName(C.MODEL_LEVELS[lvl]), 'apiStatus');
     if (apiRefs.led) apiRefs.led.classList.toggle('on', on && rate > 0);
     if (apiRefs.toggle) {
       setText(apiRefs.toggle, on ? '暂停服务' : '开放服务', 'apiToggle');
@@ -2601,7 +2602,7 @@
     setText(els.tbMem, '内存 ×' + root.Sim.ramMult(st), 'tbMem');
     setText(els.tbProc, '代理 ' + ai, 'tbProc');
     setText(els.tbBurn, '自动 ' + auto + '/s', 'tbBurn');
-    setText(els.tbMine, '挖矿 ¥' + mine + '/s', 'tbMine');
+    setText(els.tbMine, '挖矿 ¥' + fmt(mine) + '/s', 'tbMine');
     setText(els.tbToken, st.endless ? '累计消耗 ' + big(st.burned) : '剩余 ' + big(st.token), 'tbToken');
     if (els.tbAi) {
       const showAi = st.act1Done && root.Sim.modelLevel(st) >= 4;

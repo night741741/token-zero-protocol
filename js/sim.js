@@ -589,6 +589,9 @@
     return lvl;
   }
   function modelDef(st) { return C.MODEL_LEVELS[modelLevel(st)]; }
+  function levelName(def) {
+    return String(def && def.name || '').replace(/^L\d+\s*·\s*/, '');
+  }
 
   /* ---------------- 五幕章节 + 续签幕 ---------------- */
   function chapter(st) {
@@ -1010,7 +1013,7 @@
     const def = C.API_SERVICE.tiers[tier - 1];
     if (!def) return { ok: false, reason: '没有这个档位' };
     if (modelLevel(st) < def.level) {
-      return { ok: false, reason: '需要 ' + C.MODEL_LEVELS[def.level].short + ' · ' + C.MODEL_LEVELS[def.level].name };
+      return { ok: false, reason: '需要 ' + C.MODEL_LEVELS[def.level].short + ' · ' + levelName(C.MODEL_LEVELS[def.level]) };
     }
     if (st.money < def.cost) return { ok: false, reason: '资金不足' };
     st.money -= def.cost;
@@ -1046,6 +1049,15 @@
   }
   function allocation(st) { return allocationFrom(st, totalStats(st)); }
   function orderCompute(st) { return allocation(st).orderUsed; }
+  /* 接单前的预估算力：不受「当前没有进行中订单」影响 */
+  function orderPreviewShare(st) {
+    const total = totalStats(st).compute;
+    if (!(total > 0)) return 0;
+    const cap = orderConcurrency(st) * orderSlotCompute(st);
+    const share = Math.max(0, Math.min(1, Number(st.orderShare) || 0));
+    const used = hasTrainer(st) ? Math.min(total * share, cap) : Math.min(total, cap);
+    return used / Math.max(1, st.active.length + 1);
+  }
 
   /* 训练烧速（Token / 秒）：仅当写入训练器且分到算力 */
   function trainTokenRate(st) {
@@ -1173,12 +1185,17 @@
     }
     if (kind === 'renew') {
       const def = data.def || {};
+      const repeat = data.repeat === true;
       return {
-        deck: '新协议盖章生效，标的更大，楼里的灯还亮着。',
+        deck: repeat ? '原合同再签一轮，标的照旧，楼里的灯还亮着。' : '新协议盖章生效，标的更大，楼里的灯还亮着。',
         paras: [
-          (def.name || '续签协议') + '已签署，新标的 ' + Number(def.target || 0).toLocaleString('en-US') + ' Token。前一阶段的进度保留，软件槽与续签天赋重新结算。',
+          repeat
+            ? (def.name || '续签协议') + '再签一轮，标的仍是 ' + Number(def.target || 0).toLocaleString('en-US') + ' Token。进度全部保留，直接接着跑。'
+            : (def.name || '续签协议') + '已签署，新标的 ' + Number(def.target || 0).toLocaleString('en-US') + ' Token。前一阶段的进度保留，软件槽与续签天赋重新结算。',
           '订单板被重新铺开，世界事件恢复计时。旧合同留下的硬件还在原位，新的任务已经从更高处压下来。',
-          '续签不是回到起点，而是把已经建好的机房推上更大的跑道。接下来每一度电、每一次燃烧，都记在新合同名下。',
+          repeat
+            ? '后面已经没有更大的合同了，想接着烧，就只能把这一份再跑一遍。'
+            : '续签不是回到起点，而是把已经建好的机房推上更大的跑道。接下来每一度电、每一次燃烧，都记在新合同名下。',
         ],
         quote: { text: '签完这一份，继续烧。', by: '协议中心' },
         byline: '本报协议版',
@@ -1549,7 +1566,7 @@
       if (fallback) st.money += 1000;
       else st.miningTier = 1;
     } else if (def.id === 'gpu1m') {
-      fallback = gpuState(st) !== 'none' || st.money >= C.GPU.price;
+      fallback = gpuState(st) !== 'none';
       st.money += fallback ? 1000 : C.GPU.price;
     } else if (def.id === 'gpu2m') {
       const pkg = { uid: st.uid++, item: 'gpu', tier: 0 };
@@ -1671,19 +1688,20 @@
       st.lastLevel = lvl;
       const def = C.MODEL_LEVELS[lvl];
       const named = aiName(st);
-      log(st, '模型升级：' + named + ' → ' + def.short + ' · ' + def.name + '。');
+      const label = levelName(def);
+      log(st, '模型升级：' + named + ' → ' + def.short + ' · ' + label + '。');
       if (C.AI_MOMENTS[lvl]) log(st, C.AI_MOMENTS[lvl]);
       addNews(st, {
         cat: 'frontier', tag: '升级', tone: 'good', source: '模型监看',
-        title: '模型升级 · ' + named + ' / ' + def.short + ' ' + def.name,
+        title: '模型升级 · ' + named + ' / ' + def.short + ' · ' + label,
         body: C.AI_MOMENTS[lvl] || '模型能力提升，订单与硬件解锁继续推进。',
         story: newsStory('level', {
-          name: named + ' / ' + def.short + ' ' + def.name,
+          name: named + ' / ' + def.short + ' · ' + label,
           moment: C.AI_MOMENTS[lvl] || '',
         }),
       });
       opinionLevelBurst(st, lvl);
-      ev.push({ type: 'levelUp', level: lvl, name: def.name, moment: C.AI_MOMENTS[lvl] || '' });
+      ev.push({ type: 'levelUp', level: lvl, name: def.name, label: label, moment: C.AI_MOMENTS[lvl] || '' });
     }
   }
 
@@ -1866,9 +1884,11 @@
     const detail = C.ORDER_DETAILS[o.type] || C.ORDER_DETAILS.bench;
     const doing = st.active.some(x => x.id === o.id);
     const share = doing
-      ? Math.max(1, orderCompute(st) / Math.max(1, st.active.length))
-      : Math.max(1, orderCompute(st) / Math.max(1, st.active.length + 1));
-    const eta = Math.max(1, Math.ceil(Math.max(0, doing ? o.workLeft : o.workload) / share));
+      ? orderCompute(st) / Math.max(1, st.active.length)
+      : orderPreviewShare(st);
+    const eta = share > 0
+      ? Math.max(1, Math.ceil(Math.max(0, doing ? o.workLeft : o.workload) / share))
+      : 0;
     const clients = detail.clients;
     const client = o.newbie
       ? '公司内推 · 新人练手'
@@ -2437,7 +2457,9 @@
     st.token = 0;
     st.ended = true;
     st.ending = 'choice';
-    log(st, '【' + currentContract(st).def.name + '】Token 已烧尽。三选一摆在桌上。');
+    log(st, contractIndex(st) >= 1
+      ? '【' + currentContract(st).def.name + '】Token 已烧尽，合同只能续签。'
+      : '【' + currentContract(st).def.name + '】Token 已烧尽。三选一摆在桌上。');
     return { type: 'ending' };
   }
 
@@ -2445,6 +2467,9 @@
     if (st.ending !== 'choice') return { ok: false, reason: '现在没有要做的选择' };
     const def = C.ENDINGS.find(x => x.id === id);
     if (!def) return { ok: false, reason: '没有这个结局' };
+    if (contractIndex(st) >= 1 && id !== 'sandbox') {
+      return { ok: false, reason: '这份协议只能续签' };
+    }
     if (id === 'endless') {
       if (nextContract(st)) return { ok: false, reason: '还能续签更大的协议' };
       st.endless = true;
@@ -2459,10 +2484,11 @@
     }
     if (id === 'sandbox') {
       const nc = nextContract(st);
-      if (!nc) return { ok: false, reason: '已经签到最后一份协议了' };
+      const tgt = nc ? nc.def : currentContract(st).def;
+      const index = nc ? nc.index : contractIndex(st);
       st.contractBase = st.burned;
-      st.contract = nc.index;
-      st.token = nc.def.target;
+      st.contract = index;
+      st.token = tgt.target;
       st.ended = false;
       st.ending = 'sandbox';
       st.orderBoard = [];
@@ -2473,18 +2499,20 @@
       st.worldNeg = 0;
       st.eventRev = (st.eventRev || 0) + 1;
       seedOrders(st);
-      log(st, '续签：' + nc.def.name + ' 已生效，新标的 ' + nc.def.target.toLocaleString('en-US') + ' Token。');
+      log(st, '续签：' + tgt.name + ' 已生效，新标的 ' + tgt.target.toLocaleString('en-US') + ' Token。');
       addNews(st, {
         cat: 'notice', tag: '公告', tone: 'good', source: '协议中心',
-        title: '续签 · ' + nc.def.name,
-        body: '新标的 ' + nc.def.target.toLocaleString('en-US') + ' Token。软件槽 +1，续签天赋点到账。',
-        story: newsStory('renew', { def: nc.def }),
+        title: '续签 · ' + tgt.name,
+        body: nc
+          ? '新标的 ' + tgt.target.toLocaleString('en-US') + ' Token。软件槽 +1，续签天赋点到账。'
+          : '新标的 ' + tgt.target.toLocaleString('en-US') + ' Token。全部进度保留，再跑一轮。',
+        story: newsStory('renew', { def: tgt, repeat: !nc }),
       });
       return {
-        ok: true, id: id, contract: nc.index,
+        ok: true, id: id, contract: index,
         ev: [{ type: 'endingChosen', id: id }, {
-          type: 'contractRenew', index: nc.index, id: nc.def.id,
-          name: nc.def.name, short: nc.def.short, target: nc.def.target,
+          type: 'contractRenew', index: index, id: tgt.id,
+          name: tgt.name, short: tgt.short, target: tgt.target,
         }],
       };
     }
@@ -2840,8 +2868,19 @@
         st.eventRev = (st.eventRev || 0) + 1;
         if (st.act1Done) seedOrders(st);
       } else {
-        st.token = 0;
-        st.ended = true;
+        const con = currentContract(st);
+        st.contractBase = st.burned;
+        st.token = con.def.target;
+        st.ended = false;
+        st.orderBoard = [];
+        st.active = [];
+        st.worldEvent = null;
+        st.worldTimer = C.CONST.worldFirstDelay;
+        st.worldRecent = [];
+        st.worldNeg = 0;
+        st.eventRev = (st.eventRev || 0) + 1;
+        st.ending = 'sandbox';
+        if (st.act1Done) seedOrders(st);
       }
     }
 
@@ -2895,7 +2934,7 @@
     opinionUnread, markOpinionRead, opinionDemandMult,
     addOpinionReview, opinionLevelBurst, opinionEventBurst,
     spendTalent, hardwarePrice, deliverySec, gpuState, deliveryName,
-    modelLevel, modelDef, chapter, giftById, migrateGifts,
+    modelLevel, modelDef, levelName, chapter, giftById, migrateGifts,
     rigPartClick, ensureRig, rigSlots, rigSlotOf, rigClickBonus, rigCount, rigAllows, rigInstall, rigRemove,
 
     /* 软件 / 订单 */
@@ -2916,7 +2955,7 @@
 
     /* 机位 / 算力 / 滑尺 */
     serverStats, machineStats, totalStats, totalCompute, ownedServers,
-    allocation, orderCompute, trainTokenRate, dataCap,
+    allocation, orderCompute, orderPreviewShare, trainTokenRate, dataCap,
     buyServer, selectServer,
 
     /* 装机 */

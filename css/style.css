@@ -2077,6 +2077,7 @@ body.portrait .opi-head{margin:6px 6px 2px;padding:12px 12px 10px}
 .en-card h2{font-size:32px;letter-spacing:6px;font-weight:400}
 .en-card p{margin-top:12px;font-size:15.5px;line-height:1.9;color:#4A4438;letter-spacing:1px}
 .en-list{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:26px 0 10px}
+.en-list.solo{grid-template-columns:minmax(0,520px);justify-content:center}
 .en-choice{font-family:inherit;text-align:left;padding:16px 16px 14px;cursor:pointer;
   background:#EFE5CE;border:2px solid var(--ink);box-shadow:4px 4px 0 rgba(0,0,0,.28);
   transition:transform .12s,box-shadow .12s,background .12s;color:var(--ink)}
@@ -2178,6 +2179,9 @@ body.portrait #mNav button:active{transform:translateY(1px);box-shadow:none}
 body.portrait #portrait-note{display:none!important}
 body.portrait #toast{bottom:58px;max-width:calc(100vw - 24px);white-space:normal;text-align:center}
 body.portrait #tip{max-width:260px}
+/* 操作提示纸签：窄屏挪到图标栏右侧，避免被右边缘裁掉 */
+body.portrait #tipNote{left:128px!important;width:min(300px,calc(100vw - 140px))!important;
+  font-size:12.5px;padding:10px 12px}
 
 /* 内部页：原尺寸、整页滚动 */
 body.portrait #pageWrap{overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}

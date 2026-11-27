@@ -257,8 +257,14 @@
     if (sub) sub.textContent = 'L' + srv.unlock + ' 解锁 · ¥' + srv.price.toLocaleString('en-US') +
       ' · ' + m.gridW + '×' + m.gridH + ' 网格';
     if (buy) {
-      buy.disabled = !state.act1Done || lvl < srv.unlock;
-      buy.textContent = lvl < srv.unlock ? ('L' + srv.unlock + ' 解锁') : '开新机位';
+      const short = state.money < srv.price;
+      buy.disabled = !state.act1Done || lvl < srv.unlock || short;
+      buy.textContent = lvl < srv.unlock
+        ? ('L' + srv.unlock + ' 解锁')
+        : short ? ('差 ¥' + Math.ceil(srv.price - state.money).toLocaleString('en-US')) : '开新机位';
+      buy.title = lvl >= srv.unlock && short
+        ? '资金不足 · 还差 ¥' + Math.ceil(srv.price - state.money).toLocaleString('en-US')
+        : '';
     }
   }
 
