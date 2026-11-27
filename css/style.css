@@ -1680,27 +1680,9 @@ body.portrait .opi-head{margin:6px 6px 2px;padding:12px 12px 10px}
 .bsearch button{flex:none;width:52px;border:0;background:#6B4F33;cursor:pointer;display:grid;place-items:center}
 .bsearch button svg{width:18px;height:18px;fill:none;stroke:#F4EAD2;stroke-width:2;stroke-linecap:round}
 .bsearch button:hover{background:#7C5D3D}
-.bhome-deck{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:14px;
-  width:min(760px,100%);margin-top:18px;align-items:start}
-.bhot{display:flex;flex-direction:column;min-width:0;background:#F5ECD7;
-  border:1.5px solid #A89A7E;box-shadow:3px 3px 0 rgba(0,0,0,.14);padding:7px 9px 6px}
-.bhot-head{display:flex;align-items:baseline;justify-content:space-between;gap:6px;
-  padding-bottom:5px;margin-bottom:2px;border-bottom:2px solid #6B4F33}
-.bhot-head b{font-size:12px;letter-spacing:3px;color:#2E2A22}
-.bhot-head span{font:8.5px Consolas,monospace;letter-spacing:1.5px;color:#9C8E74}
-.bhot-row{display:grid;grid-template-columns:16px auto minmax(0,1fr) auto;align-items:center;
-  gap:5px;width:100%;padding:4px 1px;border:0;border-bottom:1px dashed #C9BB9C;
-  background:transparent;text-align:left;cursor:pointer;font-family:inherit}
-.bhot-row:last-child{border-bottom:0}
-.bhot-row:hover{background:rgba(107,79,51,.06)}
-.bhot-row i{font:700 10px Consolas,monospace;color:#A3947A;font-style:normal;text-align:center}
-.bhot-row.top i{color:#A93B2F}
-.bhot-row em{font-style:normal;font-size:8.5px;letter-spacing:.5px;color:#6B4F33;
-  border:1px solid #C9BB9C;padding:0 3px;white-space:nowrap}
-.bhot-row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-size:11px;color:#3A362E}
-.bhot-row small{font:8.5px Consolas,monospace;color:#9C8E74;white-space:nowrap}
-.bshortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;
+.bhome-deck{display:flex;justify-content:center;width:min(760px,100%);margin-top:18px;
+  align-items:start}
+.bshortcuts{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;
   width:100%;min-width:0}
 .bshort{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;
   border:1.5px solid #B9AB8E;background:#F5ECD7;color:#3A362E;cursor:pointer;
@@ -1720,7 +1702,6 @@ body.portrait .opi-head{margin:6px 6px 2px;padding:12px 12px 10px}
 .bshort[data-key="freebies"] .bicon{background:#F4E7C9;border-color:#B08D57}
 .bshort[data-key="hot"] .bicon{background:#F5DFD4;border-color:#B96A4E}
 .bshort[data-key="maker"] .bicon{background:#EAE4D2;border-color:#9C8E74}
-.bshort[data-key="about"] .bicon{background:#E8E2D0;border-color:#9C8E74}
 .bshort[data-key="changelog"] .bicon{background:#E3E8EA;border-color:#7E939C}
 .bshort.locked{opacity:.42;cursor:not-allowed}
 .bshort.locked:hover{transform:none;box-shadow:2px 2px 0 rgba(0,0,0,.12)}
@@ -1890,6 +1871,14 @@ body.portrait .opi-head{margin:6px 6px 2px;padding:12px 12px 10px}
   display:flex;flex-direction:column;gap:2px}
 .bdoc-credits b{font-size:10px;letter-spacing:2px;color:#8A6A2A}
 .bdoc-credits span{font-size:12px;letter-spacing:.5px;color:#3A362E}
+.bdoc-sign{margin-top:12px;text-align:right;font:10px Consolas,monospace;
+  letter-spacing:1px;color:#8A6A2A}
+.bdoc-fund{margin:13px 0 4px;padding:9px 11px;border:1.5px solid #B9AB8E;background:#F5ECD7}
+.bdoc-fund-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  font:10px Consolas,monospace;letter-spacing:1px;color:#6B4F33}
+.bdoc-fund-head b{font-size:12px;color:#A93B2F}
+.bdoc-fund-bar{height:9px;margin-top:6px;border:1px solid #A89A7E;background:#E7D9BC}
+.bdoc-fund-bar i{display:block;height:100%;background:#A93B2F}
 .bdoc-pager{display:flex;justify-content:space-between;gap:8px;margin-top:14px;
   padding-top:9px;border-top:1px dashed #C9BB9C}
 .bdoc-pager button{border:0;background:transparent;padding:2px 0;cursor:pointer;
@@ -1920,6 +1909,41 @@ body.portrait .opi-head{margin:6px 6px 2px;padding:12px 12px 10px}
 .bdoc-card.terminal .bdoc-sub{color:#6F9C78}
 .bdoc-card.terminal h2{color:#C7F5CF}
 .bdoc-card.terminal p{color:#8CD29A;font:12px/1.9 Consolas,monospace;letter-spacing:.5px}
+
+/* 彩蛋：原神启动器 */
+.genshin-sheet{overflow:hidden}
+.genshin-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.genshin-top h2{margin:0;font-size:23px;letter-spacing:2px;color:#3A362E}
+.genshin-seal{flex:none;display:flex;align-items:center;justify-content:center;
+  width:58px;height:58px;margin-top:2px;transform:rotate(-4deg);
+  border:2px solid #8E2E23;border-radius:5px;background:#A93B2F;
+  color:#F7EBD0;font-size:31px;line-height:1;box-shadow:2px 3px 0 rgba(107,79,51,.35)}
+.genshin-meta{display:flex;flex-wrap:wrap;gap:5px 16px;margin-top:10px;
+  font:10px Consolas,monospace;letter-spacing:.5px;color:#8B7F66}
+.genshin-meta b{font-weight:400;color:#6B4F33}
+.genshin-log{height:168px;margin-top:11px;padding:9px 11px;overflow-y:auto;
+  border:1.5px solid #3F6B4A;background:#0E1D14;
+  box-shadow:inset 0 0 12px rgba(0,0,0,.45)}
+.genshin-log p{margin:0;font:11.5px/1.75 Consolas,monospace;letter-spacing:.4px;color:#9BE3A8}
+.genshin-log .warn{color:#E3C46A}
+.genshin-log .bad{color:#F08A7A}
+.genshin-log .dim{color:#6F9C78}
+.genshin-progress{display:flex;align-items:center;gap:10px;margin-top:12px}
+.genshin-bar{flex:1;height:13px;overflow:hidden;border:1.5px solid #6B4F33;background:#E7D9BC}
+.genshin-bar i{display:block;width:0;height:100%;background:#A93B2F;transition:width .32s ease}
+.genshin-sheet.booting .genshin-bar i{animation:genshin-pulse .9s ease-in-out infinite alternate}
+.genshin-sheet.failed .genshin-bar i{background:#6B4F33}
+.genshin-sheet.failed .genshin-seal{filter:grayscale(.55);opacity:.8}
+.genshin-progress span{min-width:36px;text-align:right;
+  font:700 11px Consolas,monospace;color:#6B4F33}
+.genshin-tip{margin:9px 0 0;font-size:11.5px;letter-spacing:1px;color:#8A6A2A}
+@keyframes genshin-pulse{from{filter:brightness(.82)}to{filter:brightness(1.18)}}
+@media (max-width:540px){
+  .genshin-top h2{font-size:20px}
+  .genshin-seal{width:46px;height:46px;font-size:24px}
+  .genshin-log{height:142px}
+  .genshin-meta{font-size:9px}
+}
 
 /* 浏览器站点容器 */
 #bpane-site{background:#0B1622}
@@ -2126,7 +2150,7 @@ body.portrait .opi-head{margin:6px 6px 2px;padding:12px 12px 10px}
 
 body.portrait .bhome-main{padding:14px 12px 0}
 body.portrait .bhero h1{font-size:31px;letter-spacing:8px;text-indent:8px}
-body.portrait .bhome-deck{grid-template-columns:1fr;gap:12px;margin-top:14px}
+body.portrait .bhome-deck{margin-top:14px}
 body.portrait .bshortcuts{grid-template-columns:repeat(4,minmax(0,1fr));row-gap:8px;margin-top:0}
 body.portrait .bshort .bicon{width:30px;height:30px}
 body.portrait .bq-tip{display:none}

@@ -48,6 +48,7 @@
   const searchVisited = new Set();
   let voicePostId = 0;
   let voiceListScroll = 0;
+  let launcherRun = 0;
 
   const SHOP_CATEGORIES = [
     { id: 'all', name: '全部', types: C.HW_SHOP_GROUPS },
@@ -159,7 +160,6 @@
       bSearchForm: $('bSearchForm'),
       bSearchInput: $('bSearchInput'),
       bMeta: $('bMeta'),
-      bHot: $('bHot'),
       bShortcuts: $('bShortcuts'),
       bQuery: $('bQuery'),
       bResults: $('bResults'),
@@ -275,14 +275,6 @@
         if (!b) return;
         const def = C.BROWSER.SHORTCUTS[Number(b.dataset.shortcut)];
         if (def) runShortcut(def);
-      });
-    }
-    if (els.bHot) {
-      els.bHot.addEventListener('click', e => {
-        const b = e.target.closest('[data-hot]');
-        if (!b) return;
-        const item = C.BROWSER.HOT[Number(b.dataset.hot)];
-        if (item) runHotTarget(item.go);
       });
     }
     if (els.bResults) {
@@ -2876,10 +2868,6 @@
     return isLocked({ key: def.app });
   }
 
-  function browserHotItems() {
-    return (C.BROWSER.HOT || []).slice(0, 6);
-  }
-
   function runHotTarget(go) {
     if (!go) return;
     if (go.site) { showBrowserSite(go.site); return; }
@@ -2903,35 +2891,10 @@
   }
 
   function renderBrowserHome() {
-    if (!els.bMeta || !els.bHot || !els.bShortcuts) return;
+    if (!els.bMeta || !els.bShortcuts) return;
     browserHomeRefs = {};
     els.bMeta.textContent = browserMetaText();
     browserHomeRefs.meta = els.bMeta;
-
-    els.bHot.innerHTML = '';
-    const hot = document.createElement('div');
-    hot.className = 'bhot-head';
-    hot.innerHTML = '<b>热搜榜</b><span>TRENDING</span>';
-    els.bHot.appendChild(hot);
-    browserHotItems().forEach((item, i) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'bhot-row' + (i < 3 ? ' top' : '');
-      b.dataset.hot = String(i);
-      const rank = document.createElement('i');
-      rank.textContent = String(item.rank || i + 1);
-      const tag = document.createElement('em');
-      tag.textContent = item.tag || '';
-      const title = document.createElement('span');
-      title.textContent = item.title;
-      const heat = document.createElement('small');
-      heat.textContent = item.heat || '';
-      b.appendChild(rank);
-      b.appendChild(tag);
-      b.appendChild(title);
-      b.appendChild(heat);
-      els.bHot.appendChild(b);
-    });
 
     els.bShortcuts.innerHTML = '';
     const newsN = root.Sim.newsUnread(st);
@@ -3137,7 +3100,6 @@
     if (browserPane === 'search') return '搜索 · ' + C.BROWSER.brand;
     if (browserPane === 'doc') {
       const parts = docKeyParts(browserDocKey);
-      if (parts.kind === 'about') return C.BROWSER.DOCS.about.title + ' · ' + C.BROWSER.brand;
       if (parts.kind === 'guide') return '机房攻略 · ' + C.BROWSER.brand;
       if (parts.kind === 'hot' || parts.kind === 'changelog') {
         return C.BROWSER.DOCS[parts.kind].title + ' · ' + C.BROWSER.brand;
@@ -3199,11 +3161,6 @@
       kw: ['声浪', '舆论', '微博', '评价', '口碑', '评论', '时间线'],
       site: 'voice',
     });
-    const about = C.BROWSER.DOCS.about;
-    out.push({
-      type: 'doc', title: about.title, desc: about.paras[0],
-      kw: about.kw.concat(about.paras), doc: 'about',
-    });
     out.push({
       type: 'doc', title: C.BROWSER.DOCS.guide.title, desc: C.BROWSER.DOCS.guide.intro,
       kw: (C.BROWSER.DOCS.guide.kw || []).concat(['攻略', '怎么玩', '新手', '教程', '玩法', '窍门']),
@@ -3234,7 +3191,8 @@
     C.BROWSER.EASTER.forEach(e => {
       out.push({
         type: 'easter', title: e.title, desc: e.desc,
-        kw: e.kw.concat([e.title, e.desc], e.body || []), doc: 'easter:' + e.id,
+        kw: e.kw.concat([e.title, e.desc], e.body || [], e.paras || [],
+          [e.thanks || '', e.note || '', e.sign || '']), doc: 'easter:' + e.id,
       });
     });
     (st.news || []).forEach(n => {
@@ -3297,7 +3255,7 @@
   }
 
   function searchSuggestions() {
-    return ['订单 并发', '白嫖 3060', '内存 带宽', '散热 风扇', '续签 百亿', '制作名单', '彩蛋'];
+    return ['订单 并发', '白嫖 3060', '内存 带宽', '散热 风扇', '续签 百亿', '制作名单', 'GTA6 发售', '原神启动', '彩蛋'];
   }
 
   function hitKey(item) {
@@ -3688,19 +3646,8 @@
   function renderDoc() {
     const body = els.bDocBody;
     if (!body) return;
+    launcherRun++;
     const parts = docKeyParts(browserDocKey);
-    if (parts.kind === 'about') {
-      const d = C.BROWSER.DOCS.about;
-      body.innerHTML = docBar('aios://doc/about') +
-        '<article class="bdoc-card about-sheet"><h2>' + d.title + '</h2>' +
-        '<div class="bdoc-sub">' + d.sub + '</div><div class="bdoc-rule"></div>' +
-        d.paras.map(p => '<p>' + p + '</p>').join('') +
-        '<div class="bdoc-credits"><b>制作名单</b><span>' + (d.foot || '') + '</span></div>' +
-        '<div class="bdoc-act"><button type="button" data-doc="guide">打开机房攻略</button>' +
-        '<button type="button" data-doc="easter:maker">看制作名单</button>' +
-        '<button type="button" data-doc="search:彩蛋">搜索「彩蛋」</button></div></article>';
-      return;
-    }
     if (parts.kind === 'hot') {
       const d = C.BROWSER.DOCS.hot;
       body.innerHTML = docBar('aios://doc/hot') +
@@ -3723,7 +3670,7 @@
         d.entries.map(e => '<section class="bdoc-ver"><h3>v' + e.v.replace(/^v/, '') +
           '<time>' + e.date + '</time></h3><ul>' +
           e.items.map(x => '<li>' + x + '</li>').join('') + '</ul></section>').join('') +
-        '<div class="bdoc-act"><button type="button" data-doc="about">关于本作</button>' +
+        '<div class="bdoc-act"><button type="button" data-doc="easter:maker">制作名单</button>' +
         '<button type="button" data-doc="back">返回</button></div></article>';
       return;
     }
@@ -3740,9 +3687,53 @@
     if (parts.kind === 'easter') {
       const e = C.BROWSER.EASTER.find(x => x.id === parts.id);
       if (!e) { browserDocKey = 'guide'; renderDoc(); return; }
+      const addr = 'aios://doc/' + browserDocKey;
+      const tail = e.action
+        ? '<button type="button" data-doc="eggact:' + e.action.id + '">' + e.action.label + '</button>'
+        : '';
+      if (e.layout === 'article') {
+        const fund = e.progress
+          ? '<div class="bdoc-fund"><div class="bdoc-fund-head"><span>' + e.progress.label +
+            '</span><b>' + e.progress.now + ' / ' + e.progress.goal + '</b></div>' +
+            '<div class="bdoc-fund-bar"><i style="width:' + e.progress.pct + '%"></i></div></div>'
+          : '';
+        body.innerHTML = docBar(addr) +
+          '<article class="bdoc-card gta-sheet"><div class="bdoc-eyebrow">ESSAY · ROOM 404</div>' +
+          '<h2>' + e.title + '</h2><div class="bdoc-sub">' + (e.kicker || '') + '</div>' +
+          '<div class="bdoc-rule"></div>' +
+          (e.paras || []).map(p => '<p>' + p + '</p>').join('') + fund +
+          (e.sign ? '<div class="bdoc-sign">' + e.sign + '</div>' : '') +
+          (e.note ? '<p class="bdoc-note">' + e.note + '</p>' : '') +
+          '<div class="bdoc-act">' + tail + '<button type="button" data-doc="search:彩蛋">继续找彩蛋</button>' +
+          '<button type="button" data-doc="back">返回</button></div></article>';
+        return;
+      }
+      if (e.layout === 'launcher') {
+        body.innerHTML = docBar(addr) +
+          '<article class="bdoc-card genshin-sheet">' +
+          '<div class="genshin-top"><div>' +
+          '<div class="bdoc-eyebrow">LOCAL LAUNCHER · ROOM 404</div>' +
+          '<h2>' + (e.headline || e.title) + '</h2>' +
+          '<div class="bdoc-sub">本机离线版 · 不联网</div></div>' +
+          '<div class="genshin-seal">原</div></div>' +
+          '<div class="bdoc-rule"></div>' +
+          '<div class="genshin-meta"><span>版本 <b>0.0.1</b></span>' +
+          '<span>区服 <b>机房内网</b></span>' +
+          '<span>状态 <b data-gstate>未启动</b></span></div>' +
+          '<div class="genshin-log" data-glog aria-live="polite"><p class="dim">等待启动。</p></div>' +
+          '<div class="genshin-progress"><div class="genshin-bar" role="progressbar" ' +
+          'aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-gtrack>' +
+          '<i data-gbar></i></div><span data-gpct>0%</span></div>' +
+          '<p class="genshin-tip">' + (e.tip || '') + '</p>' +
+          '<div class="bdoc-act"><button type="button" data-doc="eggact:genshin" data-gstart>启动</button>' +
+          '<button type="button" data-doc="search:彩蛋">继续找彩蛋</button>' +
+          '<button type="button" data-doc="back">返回</button></div>' +
+          '<p class="bdoc-note">' + (e.disclaimer || '') + '</p></article>';
+        return;
+      }
       const locked = e.gate === 'late' && !(st && st.endless);
       const lines = locked ? [e.locked || '档案已封存。'] : e.body;
-      body.innerHTML = docBar('aios://doc/' + browserDocKey) +
+      body.innerHTML = docBar(addr) +
         '<article class="bdoc-card terminal"><h2>' + e.title + '</h2>' +
         '<div class="bdoc-sub">TERMINAL · ' + e.id.toUpperCase() + '</div><div class="bdoc-rule"></div>' +
         lines.map(p => '<p>' + (p || '&nbsp;') + '</p>').join('') +
@@ -3754,10 +3745,88 @@
     renderDoc();
   }
 
+  function genshinAlive() {
+    return current === 'browser' && browserPane === 'doc' && browserDocKey === 'easter:genshin' &&
+      !!els.bDocBody && !!els.bDocBody.querySelector('.genshin-sheet');
+  }
+
+  function genshinFailure() {
+    if (!st || !st.act1Done) {
+      return ['启动失败：未检测到独立显卡。', '建议先拆开那台 RTX 3060，再启动一次。'];
+    }
+    if (st.endless) {
+      return ['启动失败：协议拦截了娱乐流量。', '清零期间，禁止进入提瓦特。'];
+    }
+    return ['启动失败：显存不足。', '检测到显卡正在接单，请稍后再试。'];
+  }
+
+  function startGenshinLaunch() {
+    if (!genshinAlive()) return;
+    const card = els.bDocBody.querySelector('.genshin-sheet');
+    const log = card.querySelector('[data-glog]');
+    const bar = card.querySelector('[data-gbar]');
+    const track = card.querySelector('[data-gtrack]');
+    const pct = card.querySelector('[data-gpct]');
+    const state = card.querySelector('[data-gstate]');
+    const btn = card.querySelector('[data-gstart]');
+    if (!log || !bar || !pct || !state || !btn) return;
+    launcherRun++;
+    const run = launcherRun;
+    const fast = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const at = (ms, fn) => setTimeout(() => {
+      if (run !== launcherRun || !genshinAlive()) return;
+      fn();
+    }, fast ? Math.min(ms, 40) : ms);
+    const line = (text, cls) => {
+      const p = document.createElement('p');
+      if (cls) p.className = cls;
+      p.textContent = text;
+      log.appendChild(p);
+      log.scrollTop = log.scrollHeight;
+    };
+    const progress = (n) => {
+      bar.style.width = n + '%';
+      pct.textContent = n + '%';
+      if (track) track.setAttribute('aria-valuenow', String(n));
+    };
+    card.classList.remove('failed');
+    card.classList.add('booting');
+    log.innerHTML = '';
+    progress(0);
+    state.textContent = '启动中';
+    btn.disabled = true;
+    btn.textContent = '启动中…';
+    root.Audio.click();
+    at(0, () => { line('[OK] 启动器已就绪'); progress(8); });
+    at(500, () => { line('[OK] 检测到键盘'); progress(26); });
+    at(1000, () => { line('[OK] 正在连接提瓦特'); progress(52); });
+    at(1500, () => { line('[WARN] 显存：不太够', 'warn'); progress(74); });
+    at(2000, () => { line('[INFO] 加载元素力…… 99%', 'dim'); progress(99); });
+    at(2700, () => {
+      card.classList.remove('booting');
+      card.classList.add('failed');
+      genshinFailure().forEach(text => line(text, 'bad'));
+      line('原神没有启动，机房还在运行。', 'bad');
+      state.textContent = '启动失败';
+      btn.disabled = false;
+      btn.textContent = '再启动一次';
+      root.Audio.error();
+    });
+  }
+
   function runDocAction(action) {
     if (!action) return;
     const parts = docKeyParts(action);
     if (parts.kind === 'back') { browserBack(); return; }
+    if (parts.kind === 'eggact') {
+      if (parts.id === 'genshin') { startGenshinLaunch(); return; }
+      const e = C.BROWSER.EASTER.find(x => x.action && x.action.id === parts.id);
+      if (e) {
+        root.Audio.click();
+        api.toast(e.action.toast);
+      }
+      return;
+    }
     if (parts.kind === 'guide') {
       openBrowserDoc(parts.id ? 'guide:' + parts.id : 'guide');
       return;
