@@ -1045,7 +1045,10 @@
       if (!Scene.pageOpen()) return;
       if (Scene.currentPage() === 'hub' && Hub.isWindowOpen()) {
         if (Hub.orderBack && Hub.orderBack()) return;
-        if (Hub.newsBack && Hub.newsBack()) return;
+        const inBrowser = Hub.currentWindow && Hub.currentWindow() === 'browser';
+        if (Hub.browserEsc && Hub.browserEsc()) return;
+        if (inBrowser) { Hub.closeWindow(); return; }
+        if (Hub.browserBack && Hub.browserBack()) return;
         Hub.closeWindow();
         return;
       }

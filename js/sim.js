@@ -110,10 +110,10 @@
       worldNeg: 0,
       eventRev: 0,
 
-      /* 机房日报 */
+      /* 头条 */
       news: [{
         id: 1, at: 0, cat: 'notice', tag: '创刊', tone: 'neutral',
-        source: '机房日报', title: '机房日报创刊号',
+        source: '头条', title: '头条创刊号',
         body: '从今天起，这里记录硬件市场、订单、模型和机房里的风吹草动。',
         eventId: null, eventRev: 0, fx: '', story: newsStory('start'),
       }],
@@ -130,6 +130,7 @@
     return {
       score: 48, target: 48, timer: 20,
       seq: 0, readSeq: 0, reviews: [],
+      liked: [], likedComments: [], notes: [], noteSeq: 0,
     };
   }
 
@@ -1100,7 +1101,7 @@
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   }
 
-  /* ---------------- 机房日报 ---------------- */
+  /* ---------------- 头条 ---------------- */
   function cleanStory(src) {
     if (!src || typeof src !== 'object') return null;
     const deck = typeof src.deck === 'string' ? src.deck.slice(0, 180) : '';
@@ -1141,7 +1142,7 @@
           '从今天起，所有新的世界事件、续签、模型升级和补给都会写进新的版面，不再只留在日志里。',
           '旧消息不会补写，新的记录从现在开始。翻回前面的报纸，能看到机房是怎么一步步走到今天的。',
         ],
-        quote: { text: '账可以旧，消息得新。', by: '机房日报编辑' },
+        quote: { text: '账可以旧，消息得新。', by: '头条编辑' },
         byline: '本报编辑部',
       };
     }
@@ -1239,7 +1240,7 @@
       notice: '这是一条机房内部记录，细节以当天的交接班日志为准。',
     }[n.cat] || '消息已记录，后续影响以机房实际状态为准。';
     return {
-      deck: n.body || '机房日报留下了一条简短记录。',
+      deck: n.body || '头条留下了一条简短记录。',
       paras: [
         n.body || '这条消息没有留下更多细节。',
         catLine,
@@ -1275,7 +1276,7 @@
       cat: item.cat || 'notice',
       tag: item.tag || '快讯',
       tone: item.tone === 'good' || item.tone === 'bad' ? item.tone : 'neutral',
-      source: item.source || '机房日报',
+      source: item.source || '头条',
       title: item.title || '机房快讯',
       body: item.body || '',
       eventId: item.eventId || null,
@@ -1502,6 +1503,66 @@
     return out;
   }
 
+  function opinionLiked(st, id) {
+    return !!(st && st.opinion && Array.isArray(st.opinion.liked) &&
+      st.opinion.liked.indexOf(Number(id)) >= 0);
+  }
+
+  function toggleOpinionLike(st, id) {
+    if (!st) return null;
+    if (!st.opinion) st.opinion = emptyOpinion();
+    const key = Number(id) | 0;
+    if (!(st.opinion.reviews || []).some(r => r.id === key)) return null;
+    if (!Array.isArray(st.opinion.liked)) st.opinion.liked = [];
+    const i = st.opinion.liked.indexOf(key);
+    if (i >= 0) { st.opinion.liked.splice(i, 1); return { liked: false }; }
+    st.opinion.liked.push(key);
+    return { liked: true };
+  }
+
+  function opinionCommentLiked(st, key) {
+    return !!(st && st.opinion && Array.isArray(st.opinion.likedComments) &&
+      st.opinion.likedComments.indexOf(String(key)) >= 0);
+  }
+
+  function toggleOpinionCommentLike(st, key) {
+    if (!st || !key) return null;
+    if (!st.opinion) st.opinion = emptyOpinion();
+    if (!Array.isArray(st.opinion.likedComments)) st.opinion.likedComments = [];
+    const k = String(key);
+    const i = st.opinion.likedComments.indexOf(k);
+    if (i >= 0) { st.opinion.likedComments.splice(i, 1); return { liked: false }; }
+    st.opinion.likedComments.push(k);
+    return { liked: true };
+  }
+
+  function opinionNotes(st, postId) {
+    if (!st || !st.opinion || !Array.isArray(st.opinion.notes)) return [];
+    return st.opinion.notes.filter(n => n.postId === Number(postId)).sort((a, b) => b.id - a.id);
+  }
+
+  function addOpinionNote(st, postId, text) {
+    if (!st) return { ok: false, reason: '还没有机房' };
+    if (!st.opinion) st.opinion = emptyOpinion();
+    const body = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    const pid = Number(postId) | 0;
+    if (!body) return { ok: false, reason: '先写点什么' };
+    if (!(st.opinion.reviews || []).some(r => r.id === pid)) {
+      return { ok: false, reason: '这条声浪已经不在了' };
+    }
+    if (!Array.isArray(st.opinion.notes)) st.opinion.notes = [];
+    const note = {
+      id: (st.opinion.noteSeq || 0) + 1,
+      postId: pid,
+      at: Math.max(0, Math.round(st.t || 0)),
+      text: body,
+    };
+    st.opinion.noteSeq = note.id;
+    st.opinion.notes.unshift(note);
+    if (st.opinion.notes.length > 60) st.opinion.notes.length = 60;
+    return { ok: true, note: note };
+  }
+
   function normalizeOpinion(st, raw) {
     const o = emptyOpinion();
     if (raw && typeof raw === 'object') {
@@ -1530,6 +1591,22 @@
       const maxId = o.reviews.reduce((m, r) => Math.max(m, r.id), 0);
       o.seq = Math.max(maxId, Number(raw.seq) || 0);
       o.readSeq = Math.max(0, Math.min(o.seq, o.readSeq));
+      const ids = new Set(o.reviews.map(r => r.id));
+      o.liked = Array.from(new Set((Array.isArray(raw.liked) ? raw.liked : [])
+        .map(Number).filter(n => ids.has(n))));
+      o.likedComments = Array.from(new Set((Array.isArray(raw.likedComments) ? raw.likedComments : [])
+        .map(String).filter(k => ids.has(Number(k.split('-')[0]))))).slice(0, 200);
+      const notes = (Array.isArray(raw.notes) ? raw.notes : []).map(n => {
+        if (!n || typeof n !== 'object') return null;
+        const pid = Number(n.postId) | 0;
+        const id = Number(n.id) | 0;
+        if (id <= 0 || !ids.has(pid)) return null;
+        const txt = typeof n.text === 'string' ? n.text.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+        if (!txt) return null;
+        return { id: id, postId: pid, at: isFinite(n.at) ? Math.max(0, Math.round(n.at)) : 0, text: txt };
+      }).filter(Boolean).sort((a, b) => b.id - a.id).slice(0, 60);
+      o.notes = notes;
+      o.noteSeq = Math.max(notes.reduce((m, n) => Math.max(m, n.id), 0), Number(raw.noteSeq) || 0);
     }
     st.opinion = o;
     const lvl = modelLevel(st);
@@ -2732,14 +2809,16 @@
         const id = Number(x.id) | 0;
         if (id <= 0 || seenNews.has(id)) return null;
         seenNews.add(id);
+        const src = typeof x.source === 'string' ? x.source.slice(0, 12) : '头条';
+        const title = typeof x.title === 'string' ? x.title.slice(0, 60) : '机房快讯';
         return {
           id: id,
           at: isFinite(x.at) ? Math.max(0, Math.round(x.at)) : 0,
           cat: newsCats.indexOf(x.cat) >= 0 && x.cat !== 'all' ? x.cat : 'notice',
           tag: typeof x.tag === 'string' ? x.tag.slice(0, 8) : '快讯',
           tone: x.tone === 'good' || x.tone === 'bad' ? x.tone : 'neutral',
-          source: typeof x.source === 'string' ? x.source.slice(0, 12) : '机房日报',
-          title: typeof x.title === 'string' ? x.title.slice(0, 60) : '机房快讯',
+          source: src === '机房日报' ? '头条' : src,
+          title: title.replace(/^机房日报/, '头条'),
           body: typeof x.body === 'string' ? x.body.slice(0, 180) : '',
           eventId: typeof x.eventId === 'string' ? x.eventId : null,
           eventRev: isFinite(x.eventRev) ? Math.max(0, x.eventRev | 0) : 0,
@@ -2755,8 +2834,8 @@
       st.newsSeq = 0;
       st.newsRead = 0;
       addNews(st, {
-        cat: 'notice', tag: '接入', tone: 'neutral', source: '机房日报',
-        title: '机房日报已接入旧存档',
+        cat: 'notice', tag: '接入', tone: 'neutral', source: '头条',
+        title: '头条已接入旧存档',
         body: '从现在起，世界事件、续签、模型升级和补给都会记在这里。',
         story: newsStory('migrate'),
       });
@@ -2933,6 +3012,8 @@
     opinionBand, opinionScore, opinionTarget, opinionStars, opinionCounts,
     opinionUnread, markOpinionRead, opinionDemandMult,
     addOpinionReview, opinionLevelBurst, opinionEventBurst,
+    opinionLiked, toggleOpinionLike, opinionCommentLiked, toggleOpinionCommentLike,
+    opinionNotes, addOpinionNote,
     spendTalent, hardwarePrice, deliverySec, gpuState, deliveryName,
     modelLevel, modelDef, levelName, chapter, giftById, migrateGifts,
     rigPartClick, ensureRig, rigSlots, rigSlotOf, rigClickBonus, rigCount, rigAllows, rigInstall, rigRemove,

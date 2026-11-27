@@ -340,16 +340,58 @@
               <div class="wfoot" id="apiFoot">每个请求消耗 40 Token · 收入按实际燃烧结算</div>
             </div>
 
-            <div class="win" id="win-news" style="left:152px;top:28px;width:900px;height:560px">
-              <div class="tb"><span>机房日报 · 世界快讯</span><span class="dots"><i></i><i></i><i></i><button class="x" title="关闭">×</button></span></div>
-              <div class="wbody scroll" id="newsBody"></div>
-              <div class="wfoot" id="newsFoot">世界事件、协议与模型动向 · 打开后标记已读</div>
-            </div>
-
-            <div class="win" id="win-opinion" style="left:152px;top:28px;width:900px;height:560px">
-              <div class="tb"><span>舆论 · 公开评价</span><span class="dots"><i></i><i></i><i></i><button class="x" title="关闭">×</button></span></div>
-              <div class="wbody scroll" id="opinionBody"></div>
-              <div class="wfoot" id="opinionFoot">模型等级、API 稳定性与世界事件都会影响口碑</div>
+            <div class="win" id="win-browser" style="left:152px;top:18px;width:900px;height:560px">
+              <div class="tb"><span id="browserTitle">浏览器 · NETSURF</span><span class="dots"><i></i><i></i><i></i><button class="x" title="关闭">×</button></span></div>
+              <div class="bnav">
+                <button type="button" id="browserBack" title="后退">←</button>
+                <button type="button" id="browserHome" title="主页">⌂</button>
+                <form class="baddr" id="bAddrForm" autocomplete="off">
+                  <span class="bproto" aria-hidden="true">aios://</span>
+                  <input id="browserAddr" type="text" value="home" spellcheck="false" aria-label="地址栏">
+                  <button type="submit" class="bgo" title="前往">↵</button>
+                </form>
+                <span class="bnet">本地索引</span>
+              </div>
+              <div class="browser-body">
+                <section class="bpane" id="bpane-home">
+                  <div class="bhome-top">
+                    <span class="bhome-brand">NETSURF <em>0.9</em></span>
+                    <span class="bhome-meta" id="bMeta">第 1 幕 · 剩余 100,000,000 Token</span>
+                  </div>
+                  <div class="bhome-main">
+                    <div class="bhero">
+                      <h1>NETSURF</h1>
+                      <p>机房内网 · 只索引这栋楼里的页面</p>
+                    </div>
+                    <form class="bsearch" id="bSearchForm" autocomplete="off">
+                      <input id="bSearchInput" type="text" maxlength="40" placeholder="搜索攻略、白嫖、订单、彩蛋…" aria-label="搜索机房内外">
+                      <button type="submit" aria-label="搜索"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></button>
+                    </form>
+                    <div class="bhome-deck">
+                      <div class="bhot" id="bHot"></div>
+                      <div class="bshortcuts" id="bShortcuts"></div>
+                    </div>
+                  </div>
+                  <div class="bfoot">NETSURF 0.9 · 本地索引 · 不联网 · 应用请从桌面打开</div>
+                </section>
+                <section class="bpane hidden" id="bpane-search">
+                  <div class="bq" id="bQuery">搜索结果</div>
+                  <div class="bresults" id="bResults"></div>
+                </section>
+                <section class="bpane hidden" id="bpane-site">
+                  <div class="bsite on" id="bsite-news">
+                    <div class="bsite-body" id="newsBody"></div>
+                    <div class="bsite-foot" id="newsFoot">世界事件、协议与模型动向 · 打开后标记已读</div>
+                  </div>
+                  <div class="bsite" id="bsite-voice">
+                    <div class="bsite-body" id="opinionBody"></div>
+                    <div class="bsite-foot" id="opinionFoot">模型等级、API 稳定性与世界事件都会影响口碑</div>
+                  </div>
+                </section>
+                <section class="bpane hidden" id="bpane-doc">
+                  <div class="bdoc" id="bDocBody"></div>
+                </section>
+              </div>
             </div>
 
             <div class="sticky" id="goalNote" style="left:800px;top:500px;width:336px">

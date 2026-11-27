@@ -37,6 +37,17 @@
   let opinionSig = '';
   let opinionRefs = {};
   let iconBadges = {};
+  let browserPane = 'home';
+  let browserSite = 'news';
+  let browserDocKey = '';
+  let browserStack = [];
+  let browserQuery = '';
+  let browserResults = [];
+  let browserHomeRefs = {};
+  let searchTab = 'all';
+  const searchVisited = new Set();
+  let voicePostId = 0;
+  let voiceListScroll = 0;
 
   const SHOP_CATEGORIES = [
     { id: 'all', name: '全部', types: C.HW_SHOP_GROUPS },
@@ -97,6 +108,7 @@
     api: '<svg viewBox="0 0 32 32"><path d="M8 21a4.5 4.5 0 0 1 .8-8.9A6 6 0 0 1 20.4 12 4 4 0 0 1 24 19.8V21"/><path d="M12 25.5 16 29l4-3.5M16 22v7"/></svg>',
     news: '<svg viewBox="0 0 32 32"><path d="M5 7h22v19H5z"/><path d="M8 11h9M8 15h9M8 19h6M20 11h3M20 15h3M20 19h3M20 23h3M8 23h6"/></svg>',
     opinion: '<svg viewBox="0 0 32 32"><path d="M6 6.5h20a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-9l-6.5 5v-5H6a2 2 0 0 1-2-2v-12a2 2 0 0 1 2-2Z"/><path d="M10 13.5h12M10 18h8"/></svg>',
+    browser: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11"/><path d="M5.4 12h21.2M5.4 20h21.2"/><path d="M16 5c-3.4 3.2-3.4 18.8 0 22M16 5c3.4 3.2 3.4 18.8 0 22"/></svg>',
     trash: '<svg viewBox="0 0 32 32"><path d="M6.5 9.5h19M12.5 9.5v-3h7v3M9 9.5l1.4 16.5h11.2L23 9.5"/><path d="M13.5 14v8M18.5 14v8"/></svg>',
   };
 
@@ -106,8 +118,7 @@
     { key: 'orders', name: '订单', sub: '第 2 幕' },
     { key: 'software', name: '软件', sub: '第 2 幕' },
     { key: 'api', name: 'API 服务', sub: C.MODEL_LEVELS[C.API_SERVICE.unlockLevel].name.split(' · ')[0] + ' · 开放模型' },
-    { key: 'news', name: '机房日报', sub: '世界快讯' },
-    { key: 'opinion', name: '舆论', sub: '公开评价' },
+    { key: 'browser', name: '浏览器', sub: '头条 / 声浪' },
     { key: 'trash', name: '回收站', sub: '硬件回收' },
   ];
 
@@ -140,6 +151,27 @@
       newsFoot: $('newsFoot'),
       opinionBody: $('opinionBody'),
       opinionFoot: $('opinionFoot'),
+      browserTitle: $('browserTitle'),
+      browserAddr: $('browserAddr'),
+      bAddrForm: $('bAddrForm'),
+      browserBack: $('browserBack'),
+      browserHome: $('browserHome'),
+      bSearchForm: $('bSearchForm'),
+      bSearchInput: $('bSearchInput'),
+      bMeta: $('bMeta'),
+      bHot: $('bHot'),
+      bShortcuts: $('bShortcuts'),
+      bQuery: $('bQuery'),
+      bResults: $('bResults'),
+      bDocBody: $('bDocBody'),
+      bSiteNews: $('bsite-news'),
+      bSiteVoice: $('bsite-voice'),
+      panes: {
+        home: $('bpane-home'),
+        search: $('bpane-search'),
+        site: $('bpane-site'),
+        doc: $('bpane-doc'),
+      },
       hint: $('hubHint'),
       chip1: $('hubChip1'),
       chip2: $('hubChip2'),
@@ -205,7 +237,7 @@
   }
 
   function bindShell() {
-    ['shop', 'apps', 'orders', 'software', 'api', 'news', 'opinion'].forEach(name => {
+    ['shop', 'apps', 'orders', 'software', 'api', 'browser'].forEach(name => {
       const win = $('win-' + name);
       if (!win) return;
       const x = win.querySelector('.x');
@@ -217,6 +249,63 @@
       });
       makeDraggable(win);
     });
+    if (els.browserBack) els.browserBack.addEventListener('click', () => browserBack());
+    if (els.browserHome) els.browserHome.addEventListener('click', () => goBrowserHome());
+    if (els.bAddrForm) {
+      els.bAddrForm.addEventListener('submit', e => {
+        e.preventDefault();
+        submitAddress(els.browserAddr ? els.browserAddr.value : '');
+      });
+    }
+    if (els.browserAddr) {
+      els.browserAddr.addEventListener('focus', () => els.browserAddr.select());
+      els.browserAddr.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { updateBrowserChrome(); els.browserAddr.blur(); }
+      });
+    }
+    if (els.bSearchForm) {
+      els.bSearchForm.addEventListener('submit', e => {
+        e.preventDefault();
+        submitSearch(els.bSearchInput ? els.bSearchInput.value : '');
+      });
+    }
+    if (els.bShortcuts) {
+      els.bShortcuts.addEventListener('click', e => {
+        const b = e.target.closest('[data-shortcut]');
+        if (!b) return;
+        const def = C.BROWSER.SHORTCUTS[Number(b.dataset.shortcut)];
+        if (def) runShortcut(def);
+      });
+    }
+    if (els.bHot) {
+      els.bHot.addEventListener('click', e => {
+        const b = e.target.closest('[data-hot]');
+        if (!b) return;
+        const item = C.BROWSER.HOT[Number(b.dataset.hot)];
+        if (item) runHotTarget(item.go);
+      });
+    }
+    if (els.bResults) {
+      els.bResults.addEventListener('click', e => {
+        const b = e.target.closest('[data-q]');
+        if (b) {
+          if (els.bSearchInput) els.bSearchInput.value = b.dataset.q;
+          submitSearch(b.dataset.q);
+          return;
+        }
+        const hit = e.target.closest('[data-hit]');
+        if (!hit) return;
+        const found = browserResults[Number(hit.dataset.hit)];
+        if (found) openSearchHit(found);
+      });
+    }
+    if (els.bDocBody) {
+      els.bDocBody.addEventListener('click', e => {
+        const b = e.target.closest('[data-doc]');
+        if (!b) return;
+        runDocAction(b.dataset.doc);
+      });
+    }
     const back = $('tbBack');
     if (back) back.addEventListener('click', () => api.exitToBuilding());
     const tbAi = $('tbAi');
@@ -309,14 +398,19 @@
     }
     else if (name === 'software') softwareCategory = 'all';
     else if (name === 'api') apiTab = 'console';
-    else if (name === 'news') {
+    else if (name === 'browser') {
+      browserPane = 'home';
+      browserSite = 'news';
+      browserDocKey = '';
+      browserStack = [];
+      browserQuery = '';
+      browserResults = [];
       newsFilter = 'all';
       newsOpen = 0;
       newsListScroll = 0;
-      if (st) root.Sim.markNewsRead(st);
-    } else if (name === 'opinion') {
       opinionFilter = 'all';
-      if (st) root.Sim.markOpinionRead(st);
+      voicePostId = 0;
+      if (els.bSearchInput) els.bSearchInput.value = '';
     }
     const pos = winPos[win.id];
     if (pos) {
@@ -328,8 +422,7 @@
     renderWindow();
     const body = name === 'shop' ? els.shopBody : name === 'apps' ? els.appBody :
       name === 'orders' ? els.orderBody : name === 'software' ? els.swBody :
-        name === 'api' ? els.apiBody : name === 'news' ? els.newsBody :
-          name === 'opinion' ? els.opinionBody : null;
+        name === 'api' ? els.apiBody : null;
     if (body) {
       body.scrollTop = 0;
       const tabs = body.querySelector('.shop-tabs');
@@ -403,7 +496,7 @@
       el.classList.toggle('open', !locked && current === def.key);
       const badge = iconBadges[def.key];
       if (badge) {
-        const n = def.key === 'news' ? unread : def.key === 'opinion' ? root.Sim.opinionUnread(st) : 0;
+        const n = def.key === 'browser' ? unread + root.Sim.opinionUnread(st) : 0;
         badge.textContent = n > 99 ? '99+' : String(n);
         badge.classList.toggle('hidden', n <= 0);
       }
@@ -416,7 +509,7 @@
     else if (current === 'orders') renderOrders();
     else if (current === 'software') renderSoftware();
     else if (current === 'api') renderApi();
-    else if (current === 'opinion') renderOpinion();
+    else if (current === 'browser') renderBrowser();
   }
 
   function refresh(state) {
@@ -1737,7 +1830,8 @@
 
   function opinionSignature() {
     const o = st.opinion || {};
-    return [o.seq || 0, (o.reviews || []).length, opinionFilter,
+    return [o.seq || 0, (o.reviews || []).length, opinionFilter, voicePostId,
+      (o.liked || []).length, (o.likedComments || []).length, (o.notes || []).length,
       root.Sim.modelLevel(st), root.Sim.aiName(st)].join('|');
   }
 
@@ -1778,9 +1872,321 @@
       root.Sim.opinionBand(st).name + ' · 低于 40 会压 API 需求，高于 60 会带来额外调用', 'opinionFoot');
   }
 
+  function isVerified(source, user) {
+    const v = C.BROWSER.VERIFIED;
+    if (source === 'media') return v.media !== false;
+    return Array.isArray(v[source]) && v[source].indexOf(user) >= 0;
+  }
+
+  function voiceSeed(id) {
+    let x = ((id | 0) * 2654435761) >>> 0;
+    x ^= x >>> 15;
+    x = Math.imul(x, 2246822519) >>> 0;
+    x ^= x >>> 13;
+    return x >>> 0;
+  }
+
+  function voiceStat(id) {
+    const s = voiceSeed(id);
+    return {
+      likes: 3 + s % 97,
+      reposts: 1 + (s >>> 7) % 23,
+      comments: 3 + (s >>> 13) % 7,
+    };
+  }
+
+  function voiceComments(rec) {
+    const seed = voiceSeed(rec.id + 77);
+    const total = voiceStat(rec.id).comments;
+    const base = rec.tone === 'bad' ? 'bad' : rec.tone === 'good' ? 'good' : 'neutral';
+    const pools = C.BROWSER.COMMENTS;
+    const sources = ['dev', 'biz', 'user', 'media'];
+    const out = [];
+    let prev = '';
+    for (let i = 0; i < total; i++) {
+      const s = voiceSeed(seed + i * 29);
+      const source = sources[s % sources.length];
+      const users = C.OPINION_USERS[source] || C.OPINION_USERS.user;
+      const user = users[(s >>> 5) % users.length];
+      let pool = pools[base];
+      if (i > 1 && (s >>> 11) % 3 === 0) pool = pools.neutral;
+      let text = pool[(s >>> 17) % pool.length];
+      if (prev && (s >>> 23) % 4 === 0) text = '@' + prev + ' ' + text;
+      out.push({
+        key: rec.id + '-' + i,
+        user: user,
+        source: source,
+        text: text,
+        verified: isVerified(source, user),
+        likes: 1 + (s >>> 9) % 34,
+        minutes: 2 + (s >>> 3) % 55,
+        reply: prev && text.charAt(0) === '@',
+      });
+      prev = user;
+    }
+    return out;
+  }
+
+  function voiceAvatar(cls, text) {
+    const av = document.createElement('span');
+    av.className = 'vc-av ' + cls;
+    av.textContent = text;
+    return av;
+  }
+
+  function vBadge() {
+    const b = document.createElement('i');
+    b.className = 'vbadge';
+    b.textContent = '✓';
+    b.title = '已认证';
+    return b;
+  }
+
+  function rerenderVoice(keep) {
+    const top = keep ? els.opinionBody.scrollTop : 0;
+    renderOpinion();
+    if (els.opinionBody) els.opinionBody.scrollTop = top;
+  }
+
+  function renderVoiceDetail(body, rec) {
+    const stat = voiceStat(rec.id);
+    const comments = voiceComments(rec);
+    const notes = root.Sim.opinionNotes(st, rec.id);
+    const likedPost = root.Sim.opinionLiked(st, rec.id);
+    const tone = rec.tone === 'good' || rec.tone === 'bad' ? rec.tone : 'neutral';
+    const totalComments = comments.length + notes.length;
+
+    const bar = document.createElement('div');
+    bar.className = 'vd-bar';
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'vd-back';
+    back.textContent = '← 回声浪';
+    back.addEventListener('click', () => { if (!browserBack()) voiceBackToList(); });
+    const issue = document.createElement('span');
+    issue.className = 'vd-issue';
+    issue.textContent = '帖子 #' + rec.id + ' · ' + opinionSourceName(rec.source) + ' · ' + opinionClock(rec.at);
+    const me = document.createElement('span');
+    me.className = 'vd-me';
+    me.textContent = '内部观察员 · 只读身份';
+    bar.appendChild(back);
+    bar.appendChild(issue);
+    bar.appendChild(me);
+    body.appendChild(bar);
+
+    const post = document.createElement('article');
+    post.className = 'vd-post tone-' + tone;
+    const head = document.createElement('div');
+    head.className = 'vd-head';
+    const av = voiceAvatar(rec.source, ({ dev: '研', biz: '企', user: '用', media: '媒' })[rec.source] || '用');
+    av.classList.add('vd-av');
+    av.classList.remove('vc-av');
+    const name = document.createElement('div');
+    name.className = 'vd-name';
+    const who = document.createElement('b');
+    who.textContent = rec.user;
+    if (isVerified(rec.source, rec.user)) who.appendChild(vBadge());
+    const meta = document.createElement('span');
+    meta.textContent = opinionSourceName(rec.source) + ' · ' + opinionClock(rec.at) + ' · 来自机房内网';
+    name.appendChild(who);
+    name.appendChild(meta);
+    head.appendChild(av);
+    head.appendChild(name);
+
+    const text = document.createElement('p');
+    text.className = 'vd-text';
+    text.textContent = rec.text;
+
+    post.appendChild(head);
+    post.appendChild(text);
+    if (rec.event) {
+      const ev = document.createElement('span');
+      ev.className = 'vd-event';
+      ev.textContent = rec.event;
+      post.appendChild(ev);
+    }
+
+    const metrics = document.createElement('div');
+    metrics.className = 'vd-metrics';
+    const repost = document.createElement('span');
+    repost.textContent = '转发 ' + stat.reposts + ' · 静态';
+    const like = document.createElement('button');
+    like.type = 'button';
+    like.className = 'vd-like' + (likedPost ? ' on' : '');
+    like.setAttribute('aria-pressed', likedPost ? 'true' : 'false');
+    like.textContent = (likedPost ? '♥ 已赞 ' : '♥ 赞 ') + (stat.likes + (likedPost ? 1 : 0));
+    like.addEventListener('click', () => {
+      root.Sim.toggleOpinionLike(st, rec.id);
+      root.Audio.click();
+      rerenderVoice(true);
+    });
+    const cmt = document.createElement('span');
+    cmt.textContent = '评论 ' + totalComments + ' · 星 ' + (rec.stars || 3);
+    metrics.appendChild(repost);
+    metrics.appendChild(like);
+    metrics.appendChild(cmt);
+    post.appendChild(metrics);
+    body.appendChild(post);
+
+    const head2 = document.createElement('div');
+    head2.className = 'vd-sec';
+    head2.textContent = '评论 · ' + totalComments + ' 条' + (notes.length ? ' · 含我的 ' + notes.length + ' 条观察' : '');
+    body.appendChild(head2);
+
+    const list = document.createElement('div');
+    list.className = 'vd-comments';
+
+    notes.forEach(n => {
+      const item = document.createElement('div');
+      item.className = 'vd-comment own';
+      const top = document.createElement('div');
+      top.className = 'vc-top';
+      const cav = voiceAvatar('user', '我');
+      const cm = document.createElement('div');
+      cm.className = 'vc-meta';
+      const cb = document.createElement('b');
+      cb.textContent = '内部观察员';
+      const tag = document.createElement('em');
+      tag.className = 'vc-tag';
+      tag.textContent = '我';
+      cb.appendChild(tag);
+      const cs = document.createElement('span');
+      cs.textContent = '机房内网 · ' + opinionClock(n.at) + ' · 仅自己可见';
+      cm.appendChild(cb);
+      cm.appendChild(cs);
+      const mine = document.createElement('span');
+      mine.className = 'vc-like own-tag';
+      mine.textContent = '观察笔记';
+      top.appendChild(cav);
+      top.appendChild(cm);
+      top.appendChild(mine);
+      const p = document.createElement('p');
+      p.textContent = n.text;
+      item.appendChild(top);
+      item.appendChild(p);
+      list.appendChild(item);
+    });
+
+    comments.forEach(c => {
+      const item = document.createElement('div');
+      item.className = 'vd-comment';
+      const top = document.createElement('div');
+      top.className = 'vc-top';
+      const cav = voiceAvatar(c.source, ({ dev: '研', biz: '企', user: '用', media: '媒' })[c.source] || '用');
+      const cm = document.createElement('div');
+      cm.className = 'vc-meta';
+      const cb = document.createElement('b');
+      cb.textContent = c.user;
+      if (c.verified) cb.appendChild(vBadge());
+      const cs = document.createElement('span');
+      cs.textContent = opinionSourceName(c.source) + ' · ' + c.minutes + ' 分钟前';
+      cm.appendChild(cb);
+      cm.appendChild(cs);
+      const liked = root.Sim.opinionCommentLiked(st, c.key);
+      const likeBtn = document.createElement('button');
+      likeBtn.type = 'button';
+      likeBtn.className = 'vc-like' + (liked ? ' on' : '');
+      likeBtn.setAttribute('aria-pressed', liked ? 'true' : 'false');
+      likeBtn.textContent = (liked ? '♥ ' : '♡ ') + (c.likes + (liked ? 1 : 0));
+      likeBtn.addEventListener('click', () => {
+        root.Sim.toggleOpinionCommentLike(st, c.key);
+        root.Audio.click();
+        rerenderVoice(true);
+      });
+      top.appendChild(cav);
+      top.appendChild(cm);
+      top.appendChild(likeBtn);
+      const p = document.createElement('p');
+      if (c.reply) {
+        const at = document.createElement('span');
+        at.className = 'vc-reply';
+        const space = c.text.indexOf(' ');
+        at.textContent = c.text.slice(0, space + 1);
+        p.appendChild(at);
+        p.appendChild(document.createTextNode(c.text.slice(space + 1)));
+      } else {
+        p.textContent = c.text;
+      }
+      item.appendChild(top);
+      item.appendChild(p);
+      list.appendChild(item);
+    });
+    body.appendChild(list);
+
+    const form = document.createElement('form');
+    form.className = 'vd-compose';
+    const memo = document.createElement('div');
+    memo.className = 'vd-compose-note';
+    memo.textContent = '内部观察员 · 写下的内容只留在本机存档，不改变口碑';
+    const row = document.createElement('div');
+    row.className = 'vd-compose-row';
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.maxLength = 120;
+    inp.placeholder = '写一条观察笔记…';
+    inp.setAttribute('aria-label', '观察笔记');
+    const send = document.createElement('button');
+    send.type = 'submit';
+    send.textContent = '记录';
+    row.appendChild(inp);
+    row.appendChild(send);
+    form.appendChild(memo);
+    form.appendChild(row);
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const res = root.Sim.addOpinionNote(st, rec.id, inp.value);
+      if (!res.ok) {
+        root.Audio.error();
+        api.toast(res.reason || '记不下来');
+        return;
+      }
+      root.Audio.paper();
+      api.toast('观察笔记已记录在本机');
+      rerenderVoice(true);
+    });
+    body.appendChild(form);
+  }
+
+  function openVoicePost(id) {
+    const rec = (st.opinion.reviews || []).find(r => r.id === id);
+    if (!rec) return false;
+    if (current === 'browser') browserPush();
+    if (!voicePostId && els.opinionBody) voiceListScroll = els.opinionBody.scrollTop;
+    voicePostId = rec.id;
+    renderOpinion();
+    updateBrowserChrome();
+    if (els.opinionBody) els.opinionBody.scrollTop = 0;
+    root.Audio.paper();
+    return true;
+  }
+
+  function voiceBackToList() {
+    if (!voicePostId) return false;
+    voicePostId = 0;
+    renderOpinion();
+    updateBrowserChrome();
+    if (els.opinionBody) els.opinionBody.scrollTop = voiceListScroll;
+    root.Audio.paper();
+    return true;
+  }
+
   function renderOpinion() {
     const body = els.opinionBody;
     if (!body) return;
+    if (voicePostId) {
+      const rec = (st.opinion.reviews || []).find(r => r.id === voicePostId);
+      if (rec) {
+        body.innerHTML = '';
+        lastChrome = {};
+        opinionRefs = {};
+        renderVoiceDetail(body, rec);
+        root.Sim.markOpinionRead(st);
+        opinionSig = opinionSignature();
+        updateOpinionChrome();
+        return;
+      }
+      voicePostId = 0;
+    }
     body.innerHTML = '';
     lastChrome = {};
     opinionRefs = {};
@@ -1790,30 +2196,45 @@
     const counts = root.Sim.opinionCounts(st);
     const total = counts.good + counts.neutral + counts.bad;
     const avg = root.Sim.opinionStars(st);
+    const reviews = st.opinion.reviews || [];
+    const likedN = (st.opinion.liked || []).length;
+    const notes = st.opinion.notes || [];
+    const unread = root.Sim.opinionUnread(st);
+    const myName = root.Sim.aiName(st);
 
-    renderCategoryTabs(body, C.OPINION_SOURCES, opinionFilter, cat => {
-      if (cat.id === 'all') return total;
-      return (st.opinion.reviews || []).filter(r => r.source === cat.id).length;
-    }, id => {
-      opinionFilter = id;
-      renderOpinion();
-      body.scrollTop = 0;
-      centerActiveTab(body);
-    });
+    const wrap = document.createElement('div');
+    wrap.className = 'voice-wrap';
 
-    const head = document.createElement('section');
-    head.className = 'opi-head';
+    /* 左栏：模型名片与口碑 */
+    const side = document.createElement('aside');
+    side.className = 'voice-side';
+    const card = document.createElement('div');
+    card.className = 'vs-card';
     const who = document.createElement('div');
-    who.className = 'opi-who';
+    who.className = 'vs-who';
+    const av = document.createElement('span');
+    av.className = 'vs-ava';
+    av.textContent = Array.from(myName)[0] || '零';
+    const idBox = document.createElement('div');
+    idBox.className = 'vs-id';
     const name = document.createElement('b');
-    name.textContent = root.Sim.aiName(st);
+    name.textContent = myName;
+    name.appendChild(vBadge());
     const sub = document.createElement('span');
-    sub.textContent = 'L' + root.Sim.modelLevel(st) + ' · ' + band.name + ' · 公开评价';
-    who.appendChild(name);
-    who.appendChild(sub);
+    sub.textContent = 'L' + root.Sim.modelLevel(st) + ' · ' + band.name;
+    idBox.appendChild(name);
+    idBox.appendChild(sub);
+    who.appendChild(av);
+    who.appendChild(idBox);
+    card.appendChild(who);
+
+    const me = document.createElement('div');
+    me.className = 'vs-me';
+    me.innerHTML = '<b>内部观察员</b><span>只读身份 · 点赞与笔记只留在本机</span>';
+    card.appendChild(me);
 
     const scoreBox = document.createElement('div');
-    scoreBox.className = 'opi-score' + (score >= 60 ? ' good' : score <= 40 ? ' bad' : '');
+    scoreBox.className = 'opi-score vs-score' + (score >= 60 ? ' good' : score <= 40 ? ' bad' : '');
     const scoreNum = document.createElement('b');
     scoreNum.textContent = String(Math.round(score));
     const scoreMax = document.createElement('span');
@@ -1823,11 +2244,10 @@
     scoreBox.appendChild(scoreNum);
     scoreBox.appendChild(scoreMax);
     scoreBox.appendChild(mood);
-    head.appendChild(who);
-    head.appendChild(scoreBox);
+    card.appendChild(scoreBox);
 
     const metrics = document.createElement('div');
-    metrics.className = 'opi-metrics';
+    metrics.className = 'opi-metrics vs-metrics';
     const stars = document.createElement('div');
     stars.className = 'opi-stars';
     stars.textContent = opinionStarsText(avg) + ' ' + avg.toFixed(1);
@@ -1836,7 +2256,7 @@
     countText.textContent = '好评 ' + counts.good + ' · 中立 ' + counts.neutral + ' · 差评 ' + counts.bad;
     metrics.appendChild(stars);
     metrics.appendChild(countText);
-    head.appendChild(metrics);
+    card.appendChild(metrics);
 
     const bars = document.createElement('div');
     bars.className = 'opi-bars';
@@ -1853,45 +2273,112 @@
     bars.appendChild(goodBar);
     bars.appendChild(neutralBar);
     bars.appendChild(badBar);
-    head.appendChild(bars);
+    card.appendChild(bars);
 
-    const note = document.createElement('p');
-    note.className = 'opi-note';
-    note.textContent = '名字写进协议之后，外面的声音就会跟着模型一起变。升级、API 波动与突发世界事件都会留下评价。';
-    head.appendChild(note);
-    body.appendChild(head);
+    const mineStats = document.createElement('div');
+    mineStats.className = 'vs-stats';
+    [['点赞', likedN], ['观察笔记', notes.length], ['未读', unread]].forEach(x => {
+      const d = document.createElement('div');
+      const n = document.createElement('b');
+      n.textContent = String(x[1]);
+      const s = document.createElement('span');
+      s.textContent = x[0];
+      d.appendChild(n);
+      d.appendChild(s);
+      mineStats.appendChild(d);
+    });
+    card.appendChild(mineStats);
+    side.appendChild(card);
 
-    opinionRefs.score = scoreNum;
-    opinionRefs.scoreBox = scoreBox;
-    opinionRefs.mood = mood;
-    opinionRefs.stars = stars;
-    opinionRefs.counts = countText;
-    opinionRefs.bars = { good: goodBar, neutral: neutralBar, bad: badBar };
+    if (notes.length) {
+      const memo = document.createElement('div');
+      memo.className = 'vs-notes';
+      const mh = document.createElement('h3');
+      mh.textContent = '我的观察';
+      memo.appendChild(mh);
+      notes.slice(0, 3).forEach(n => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = n.text;
+        b.title = opinionClock(n.at);
+        b.addEventListener('click', () => openVoicePost(n.postId));
+        memo.appendChild(b);
+      });
+      side.appendChild(memo);
+    }
+    wrap.appendChild(side);
 
-    const list = (st.opinion.reviews || []).filter(r => opinionFilter === 'all' || r.source === opinionFilter);
-    body.appendChild(sec('最新评价 · ' + list.length + ' 条' + (opinionFilter === 'all' ? '' : ' · ' + opinionSourceName(opinionFilter))));
+    /* 中栏：时间线 */
+    const main = document.createElement('main');
+    main.className = 'voice-main';
+    const mhead = document.createElement('div');
+    mhead.className = 'vm-head';
+    const mt = document.createElement('div');
+    const h2 = document.createElement('h2');
+    h2.textContent = '声浪';
+    const ms = document.createElement('span');
+    ms.textContent = 'OPINION · 公共时间线 · 每条发言都有温度';
+    mt.appendChild(h2);
+    mt.appendChild(ms);
+    const badge = document.createElement('em');
+    badge.textContent = opinionFilter === 'all' ? total + ' 条' : opinionSourceName(opinionFilter);
+    mhead.appendChild(mt);
+    mhead.appendChild(badge);
+    main.appendChild(mhead);
+
+    renderCategoryTabs(main, C.OPINION_SOURCES, opinionFilter, cat => {
+      if (cat.id === 'all') return total;
+      return reviews.filter(r => r.source === cat.id).length;
+    }, id => {
+      opinionFilter = id;
+      renderOpinion();
+      body.scrollTop = 0;
+      centerActiveTab(body);
+    });
+
+    const list = reviews.filter(r => opinionFilter === 'all' || r.source === opinionFilter);
+    const feed = document.createElement('div');
+    feed.className = 'opi-list voice-feed';
+    const secLabel = document.createElement('div');
+    secLabel.className = 'vm-sec';
+    secLabel.textContent = '最新声浪 · ' + list.length + ' 条' +
+      (opinionFilter === 'all' ? '' : ' · ' + opinionSourceName(opinionFilter));
+    main.appendChild(secLabel);
+
     if (!list.length) {
       const empty = document.createElement('div');
       empty.className = 'opi-empty';
       empty.textContent = total
         ? '这个来源下还没有评价，换个标签看看。'
         : '还没有公开评价。模型升到 L1 后，外面会开始有人讨论它。';
-      body.appendChild(empty);
+      main.appendChild(empty);
     } else {
-      const feed = document.createElement('div');
-      feed.className = 'opi-list';
       list.forEach((r, i) => {
-        const card = document.createElement('article');
-        card.className = 'opi-card tone-' + (r.tone || 'neutral') + (i === 0 ? ' fresh' : '');
+        const stat = voiceStat(r.id);
+        const liked = root.Sim.opinionLiked(st, r.id);
+        const noteN = notes.filter(n => n.postId === r.id).length;
+        const item = document.createElement('article');
+        item.className = 'opi-card voice-card tone-' + (r.tone || 'neutral') + (i === 0 ? ' fresh' : '');
+        item.tabIndex = 0;
+        item.setAttribute('role', 'button');
+        item.setAttribute('aria-label', '查看评论：' + r.user);
+        item.addEventListener('click', () => openVoicePost(r.id));
+        item.addEventListener('keydown', e => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          openVoicePost(r.id);
+        });
+
         const top = document.createElement('div');
         top.className = 'opi-card-top';
-        const av = document.createElement('span');
-        av.className = 'opi-av ' + r.source;
-        av.textContent = ({ dev: '研', biz: '企', user: '用', media: '媒' })[r.source] || '用';
+        const cav = document.createElement('span');
+        cav.className = 'opi-av ' + r.source;
+        cav.textContent = ({ dev: '研', biz: '企', user: '用', media: '媒' })[r.source] || '用';
         const meta = document.createElement('div');
         meta.className = 'opi-meta';
         const user = document.createElement('b');
         user.textContent = r.user;
+        if (isVerified(r.source, r.user)) user.appendChild(vBadge());
         const info = document.createElement('span');
         info.textContent = opinionSourceName(r.source) + ' · ' + opinionClock(r.at);
         meta.appendChild(user);
@@ -1899,7 +2386,7 @@
         const star = document.createElement('em');
         star.className = 'opi-card-stars';
         star.textContent = opinionStarsText(r.stars || 3);
-        top.appendChild(av);
+        top.appendChild(cav);
         top.appendChild(meta);
         top.appendChild(star);
 
@@ -1907,25 +2394,126 @@
         text.textContent = r.text;
 
         const foot = document.createElement('div');
-        foot.className = 'opi-card-foot';
+        foot.className = 'opi-card-foot vc-foot';
         if (r.event) {
           const ev = document.createElement('span');
           ev.className = 'opi-event';
           ev.textContent = r.event;
           foot.appendChild(ev);
         }
-        const likes = document.createElement('span');
-        likes.className = 'opi-likes';
-        likes.textContent = '有用 ' + (2 + (r.id * 7) % 29);
-        foot.appendChild(likes);
+        const acts = document.createElement('div');
+        acts.className = 'vc-acts';
+        const likeBtn = document.createElement('button');
+        likeBtn.type = 'button';
+        likeBtn.className = 'vc-act' + (liked ? ' on' : '');
+        likeBtn.setAttribute('aria-pressed', liked ? 'true' : 'false');
+        likeBtn.textContent = (liked ? '♥ ' : '♡ ') + (stat.likes + (liked ? 1 : 0)) + ' 赞';
+        likeBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          root.Sim.toggleOpinionLike(st, r.id);
+          root.Audio.click();
+          rerenderVoice(true);
+        });
+        const cmtBtn = document.createElement('button');
+        cmtBtn.type = 'button';
+        cmtBtn.className = 'vc-act';
+        cmtBtn.textContent = '✎ ' + (stat.comments + noteN) + ' 评论';
+        cmtBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          openVoicePost(r.id);
+        });
+        const repost = document.createElement('span');
+        repost.className = 'vc-static';
+        repost.textContent = '⇄ ' + stat.reposts + ' 转发';
+        acts.appendChild(likeBtn);
+        acts.appendChild(cmtBtn);
+        acts.appendChild(repost);
+        foot.appendChild(acts);
 
-        card.appendChild(top);
-        card.appendChild(text);
-        card.appendChild(foot);
-        feed.appendChild(card);
+        item.appendChild(top);
+        item.appendChild(text);
+        item.appendChild(foot);
+        feed.appendChild(item);
       });
-      body.appendChild(feed);
+      main.appendChild(feed);
     }
+    wrap.appendChild(main);
+
+    /* 右栏：热帖与推荐 */
+    const rail = document.createElement('aside');
+    rail.className = 'voice-rail';
+    const hotBox = document.createElement('section');
+    hotBox.className = 'vr-box';
+    const hotHead = document.createElement('h3');
+    hotHead.textContent = '热帖';
+    hotBox.appendChild(hotHead);
+    reviews.slice().sort((a, b) => voiceStat(b.id).likes - voiceStat(a.id).likes)
+      .slice(0, 5).forEach((r, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'vr-hot';
+        const rank = document.createElement('i');
+        rank.textContent = String(i + 1);
+        const txt = document.createElement('span');
+        txt.textContent = r.text;
+        const heat = document.createElement('small');
+        heat.textContent = voiceStat(r.id).likes + ' 赞';
+        b.appendChild(rank);
+        b.appendChild(txt);
+        b.appendChild(heat);
+        b.addEventListener('click', () => openVoicePost(r.id));
+        hotBox.appendChild(b);
+      });
+    rail.appendChild(hotBox);
+
+    const followBox = document.createElement('section');
+    followBox.className = 'vr-box';
+    const fhead = document.createElement('h3');
+    fhead.textContent = '推荐关注';
+    followBox.appendChild(fhead);
+    const seen = new Set();
+    reviews.forEach(r => {
+      if (seen.size >= 5 || !isVerified(r.source, r.user) || seen.has(r.user)) return;
+      seen.add(r.user);
+      const row = document.createElement('div');
+      row.className = 'vr-follow';
+      const a = document.createElement('span');
+      a.className = 'opi-av ' + r.source;
+      a.textContent = ({ dev: '研', biz: '企', user: '用', media: '媒' })[r.source] || '用';
+      const inf = document.createElement('div');
+      const nm = document.createElement('b');
+      nm.textContent = r.user;
+      nm.appendChild(vBadge());
+      const ds = document.createElement('span');
+      ds.textContent = opinionSourceName(r.source);
+      inf.appendChild(nm);
+      inf.appendChild(ds);
+      row.appendChild(a);
+      row.appendChild(inf);
+      followBox.appendChild(row);
+    });
+    if (!seen.size) {
+      const none = document.createElement('p');
+      none.className = 'vr-empty';
+      none.textContent = '还没有可关注的认证账号。';
+      followBox.appendChild(none);
+    }
+    rail.appendChild(followBox);
+
+    const rule = document.createElement('section');
+    rule.className = 'vr-box vr-rule';
+    rule.innerHTML = '<h3>版规</h3><p>点赞不改变口碑；观察笔记只写在本机。真实评价来自模型升级、API 波动与世界事件。</p>';
+    rail.appendChild(rule);
+    wrap.appendChild(rail);
+
+    body.appendChild(wrap);
+
+    opinionRefs.score = scoreNum;
+    opinionRefs.scoreBox = scoreBox;
+    opinionRefs.mood = mood;
+    opinionRefs.stars = stars;
+    opinionRefs.counts = countText;
+    opinionRefs.bars = { good: goodBar, neutral: neutralBar, bad: badBar };
 
     root.Sim.markOpinionRead(st);
     opinionSig = opinionSignature();
@@ -1971,9 +2559,11 @@
   function openNewsDetail(id) {
     const rec = st.news.find(n => n.id === id);
     if (!rec) return false;
+    if (current === 'browser') browserPush();
     if (!newsOpen && els.newsBody) newsListScroll = els.newsBody.scrollTop;
     newsOpen = rec.id;
     renderNews();
+    updateBrowserChrome();
     if (els.newsBody) els.newsBody.scrollTop = 0;
     root.Audio.paper();
     return true;
@@ -1983,6 +2573,7 @@
     if (!newsOpen) return false;
     newsOpen = 0;
     renderNews();
+    updateBrowserChrome();
     if (restoreScroll && els.newsBody) els.newsBody.scrollTop = newsListScroll;
     root.Audio.paper();
     return true;
@@ -2016,7 +2607,7 @@
     back.type = 'button';
     back.className = 'na-back';
     back.textContent = '← 返回列表';
-    back.addEventListener('click', () => newsBackToList(true));
+    back.addEventListener('click', () => { if (!browserBack()) newsBackToList(true); });
     const issue = document.createElement('span');
     issue.className = 'na-issue';
     issue.textContent = '第 ' + rec.id + ' 期 · ' + catName + ' · ' + (rec.tag || '快讯');
@@ -2031,9 +2622,9 @@
     const kicker = document.createElement('div');
     kicker.className = 'na-kicker';
     const brand = document.createElement('b');
-    brand.textContent = '机房日报';
+    brand.textContent = '头条';
     const section = document.createElement('span');
-    section.textContent = catName + ' · ' + (rec.source || '机房日报');
+    section.textContent = catName + ' · ' + (rec.source || '头条');
     kicker.appendChild(brand);
     kicker.appendChild(section);
 
@@ -2147,7 +2738,7 @@
     bottomBack.type = 'button';
     bottomBack.className = 'na-back bottom';
     bottomBack.textContent = '← 返回列表';
-    bottomBack.addEventListener('click', () => newsBackToList(true));
+    bottomBack.addEventListener('click', () => { if (!browserBack()) newsBackToList(true); });
     const hint = document.createElement('span');
     hint.textContent = 'Esc 返回列表 · 分类与滚动位置会保留';
     actions.appendChild(bottomBack);
@@ -2191,7 +2782,7 @@
 
     const banner = document.createElement('div');
     banner.className = 'news-banner';
-    banner.innerHTML = '<div><b>机房日报</b><span>NEWSROOM · ROOM 404</span></div>' +
+    banner.innerHTML = '<div><b>头条</b><span>HEADLINES · ROOM 404</span></div>' +
       '<em>第 ' + (st.newsSeq || 1) + ' 期 · 纸面记录，盖章为准</em>';
     body.appendChild(banner);
 
@@ -2224,7 +2815,7 @@
         const tag = document.createElement('b');
         tag.textContent = n.tag || '快讯';
         const cat = document.createElement('span');
-        cat.textContent = newsCatName(n.cat) + ' · ' + (n.source || '机房日报');
+        cat.textContent = newsCatName(n.cat) + ' · ' + (n.source || '头条');
         const time = document.createElement('time');
         time.textContent = newsClock(n.at);
         meta.appendChild(tag); meta.appendChild(cat); meta.appendChild(time);
@@ -2258,6 +2849,940 @@
     root.Sim.markNewsRead(st);
     updateNewsChrome();
     if (unread > 0) root.Audio.paper();
+  }
+
+  /* ---------------- 浏览器：路由 / 首页 / 搜索 / 文档 ---------------- */
+  const BICON = {
+    news: ART.news,
+    voice: ART.opinion,
+    guide: '<svg viewBox="0 0 32 32"><path d="M6 5.5h8a4 4 0 0 1 4 4V27a4 4 0 0 0-4-4H6z"/><path d="M26 5.5h-8a4 4 0 0 0-4 4V27a4 4 0 0 1 4-4h8z"/></svg>',
+    about: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11"/><path d="M16 14.5V23"/><circle cx="16" cy="10" r="1.4"/></svg>',
+    freebies: '<svg viewBox="0 0 32 32"><path d="M5 12.5h22v6H5zM7 18.5V27h18v-8.5M16 12.5V27"/><path d="M16 12.5c-4.5 0-6.5-2-6.5-4s2.5-2.5 4-1.2c1.2 1 2.5 5.2 2.5 5.2Zm0 0c4.5 0 6.5-2 6.5-4s-2.5-2.5-4-1.2c-1.2 1-2.5 5.2-2.5 5.2Z"/></svg>',
+    hot: '<svg viewBox="0 0 32 32"><path d="M16 4c1.6 5.2-3.2 6.6-3.2 10.4 0 1.8 1.1 3 2.4 3 2 0 3-1.7 2.6-4.4 2.8 2.2 4.2 4.8 4.2 7.6A8 8 0 0 1 8 20.6C8 15 12.2 11.4 16 4Z"/></svg>',
+    maker: '<svg viewBox="0 0 32 32"><path d="M20.5 5.5 26.5 11.5 12 26H6v-6z"/><path d="m17.5 8.5 6 6"/></svg>',
+    changelog: '<svg viewBox="0 0 32 32"><path d="M8 5h16v22H8z"/><path d="M12 10h8M12 15h8M12 20h5"/><circle cx="22" cy="23" r="2.2"/></svg>',
+  };
+
+  function browserMetaText() {
+    if (!st) return 'AI-OS 0.9 · 本地索引';
+    const num = root.Sim.chapter(st).num;
+    return '第 ' + num + ' 幕 · ' + (st.endless
+      ? '累计消耗 ' + big(st.burned)
+      : '剩余 ' + big(st.token) + ' Token');
+  }
+
+  function browserShortcutLocked(def) {
+    if (def.kind !== 'app') return false;
+    return isLocked({ key: def.app });
+  }
+
+  function browserHotItems() {
+    return (C.BROWSER.HOT || []).slice(0, 6);
+  }
+
+  function runHotTarget(go) {
+    if (!go) return;
+    if (go.site) { showBrowserSite(go.site); return; }
+    if (go.doc) { openBrowserDoc(go.doc); return; }
+    if (go.q) submitSearch(go.q);
+  }
+
+  function syncBrowserHome() {
+    if (!st) return;
+    if (browserHomeRefs.meta) browserHomeRefs.meta.textContent = browserMetaText();
+    const newsN = root.Sim.newsUnread(st);
+    const voiceN = root.Sim.opinionUnread(st);
+    if (browserHomeRefs.newsBadge) {
+      browserHomeRefs.newsBadge.textContent = newsN > 99 ? '99+' : String(newsN);
+      browserHomeRefs.newsBadge.classList.toggle('hidden', newsN <= 0);
+    }
+    if (browserHomeRefs.voiceBadge) {
+      browserHomeRefs.voiceBadge.textContent = voiceN > 99 ? '99+' : String(voiceN);
+      browserHomeRefs.voiceBadge.classList.toggle('hidden', voiceN <= 0);
+    }
+  }
+
+  function renderBrowserHome() {
+    if (!els.bMeta || !els.bHot || !els.bShortcuts) return;
+    browserHomeRefs = {};
+    els.bMeta.textContent = browserMetaText();
+    browserHomeRefs.meta = els.bMeta;
+
+    els.bHot.innerHTML = '';
+    const hot = document.createElement('div');
+    hot.className = 'bhot-head';
+    hot.innerHTML = '<b>热搜榜</b><span>TRENDING</span>';
+    els.bHot.appendChild(hot);
+    browserHotItems().forEach((item, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'bhot-row' + (i < 3 ? ' top' : '');
+      b.dataset.hot = String(i);
+      const rank = document.createElement('i');
+      rank.textContent = String(item.rank || i + 1);
+      const tag = document.createElement('em');
+      tag.textContent = item.tag || '';
+      const title = document.createElement('span');
+      title.textContent = item.title;
+      const heat = document.createElement('small');
+      heat.textContent = item.heat || '';
+      b.appendChild(rank);
+      b.appendChild(tag);
+      b.appendChild(title);
+      b.appendChild(heat);
+      els.bHot.appendChild(b);
+    });
+
+    els.bShortcuts.innerHTML = '';
+    const newsN = root.Sim.newsUnread(st);
+    const voiceN = root.Sim.opinionUnread(st);
+    C.BROWSER.SHORTCUTS.forEach((def, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'bshort' + (browserShortcutLocked(def) ? ' locked' : '');
+      b.dataset.key = def.id;
+      b.dataset.shortcut = String(i);
+      b.title = def.title;
+      const icon = document.createElement('span');
+      icon.className = 'bicon';
+      icon.innerHTML = BICON[def.id] || BICON.about;
+      const name = document.createElement('span');
+      name.textContent = def.title;
+      const badge = document.createElement('i');
+      badge.className = 'sbadge hidden';
+      b.appendChild(icon);
+      b.appendChild(name);
+      b.appendChild(badge);
+      if (def.id === 'news') browserHomeRefs.newsBadge = badge;
+      if (def.id === 'voice') browserHomeRefs.voiceBadge = badge;
+      els.bShortcuts.appendChild(b);
+    });
+    syncBrowserHome();
+  }
+
+  function runShortcut(def) {
+    if (!def) return;
+    if (def.kind === 'site') { showBrowserSite(def.site); return; }
+    if (def.kind === 'doc') { openBrowserDoc(def.doc); return; }
+    if (def.kind === 'app') {
+      if (isLocked({ key: def.app })) {
+        root.Audio.error();
+        api.toast(def.app === 'api'
+          ? 'API 服务：' + apiUnlockText() + '后开放。'
+          : def.title + '：拆开 RTX 3060 后才会亮。');
+        return;
+      }
+      root.Audio.click();
+      openWindow(def.app, iconEls[def.app]);
+    }
+  }
+
+  function browserSnapshot() {
+    return {
+      pane: browserPane, site: browserSite, doc: browserDocKey,
+      newsOpen: newsOpen, voicePostId: voicePostId,
+      query: browserQuery, tab: searchTab, results: browserResults,
+      nScroll: els.newsBody ? els.newsBody.scrollTop : 0,
+      vScroll: els.opinionBody ? els.opinionBody.scrollTop : 0,
+      sScroll: els.bResults ? els.bResults.scrollTop : 0,
+    };
+  }
+
+  function browserPush() {
+    browserStack.push(browserSnapshot());
+    if (browserStack.length > 24) browserStack.shift();
+  }
+
+  function browserRestore(snap) {
+    if (!snap) return false;
+    browserPane = snap.pane;
+    browserSite = snap.site;
+    browserDocKey = snap.doc;
+    newsOpen = snap.newsOpen;
+    voicePostId = snap.voicePostId;
+    if (typeof snap.query === 'string') browserQuery = snap.query;
+    if (snap.tab) searchTab = snap.tab;
+    if (Array.isArray(snap.results)) browserResults = snap.results;
+    renderBrowser();
+    if (browserPane === 'site' && browserSite === 'news' && els.newsBody) {
+      els.newsBody.scrollTop = snap.nScroll;
+    }
+    if (browserPane === 'site' && browserSite === 'voice' && els.opinionBody) {
+      els.opinionBody.scrollTop = snap.vScroll;
+    }
+    if (browserPane === 'search' && els.bResults) els.bResults.scrollTop = snap.sScroll || 0;
+    return true;
+  }
+
+  function browserBack() {
+    if (current !== 'browser') return false;
+    if (browserStack.length) return browserRestore(browserStack.pop());
+    if (browserPane === 'site' && browserSite === 'news' && newsOpen) {
+      newsOpen = 0;
+      renderBrowser();
+      if (els.newsBody) els.newsBody.scrollTop = newsListScroll;
+      return true;
+    }
+    if (browserPane === 'site' && browserSite === 'voice' && voicePostId) {
+      voicePostId = 0;
+      renderBrowser();
+      if (els.opinionBody) els.opinionBody.scrollTop = voiceListScroll;
+      return true;
+    }
+    if (browserPane !== 'home') return goBrowserHome();
+    return false;
+  }
+
+  function browserEsc() {
+    if (current !== 'browser') return false;
+    if (browserPane === 'site') {
+      if (browserSite === 'news' && newsOpen) return browserBack();
+      if (browserSite === 'voice' && voicePostId) return browserBack();
+      return false;
+    }
+    if ((browserPane === 'search' || browserPane === 'doc') && browserStack.length) {
+      const top = browserStack[browserStack.length - 1];
+      if (top.pane === 'home') return false;
+      return browserRestore(browserStack.pop());
+    }
+    return false;
+  }
+
+  function goBrowserHome() {
+    if (current !== 'browser') return false;
+    browserPane = 'home';
+    browserSite = 'news';
+    browserDocKey = '';
+    browserStack = [];
+    browserQuery = '';
+    newsOpen = 0;
+    voicePostId = 0;
+    if (els.bSearchInput) els.bSearchInput.value = '';
+    renderBrowser();
+    root.Audio.paper();
+    return true;
+  }
+
+  function showBrowserSite(site) {
+    const def = C.BROWSER.sites[site];
+    if (!def) return false;
+    if (browserPane !== 'site' || browserSite !== site) browserPush();
+    browserPane = 'site';
+    browserSite = site;
+    browserDocKey = '';
+    if (site === 'news') {
+      newsOpen = 0;
+      if (st) root.Sim.markNewsRead(st);
+    } else {
+      voicePostId = 0;
+      if (st) root.Sim.markOpinionRead(st);
+    }
+    renderBrowser();
+    root.Audio.paper();
+    return true;
+  }
+
+  function openBrowserDoc(key) {
+    if (!key) return false;
+    if (browserPane === 'doc' && browserDocKey === key) return true;
+    browserPush();
+    browserPane = 'doc';
+    browserDocKey = key;
+    renderBrowser();
+    root.Audio.paper();
+    return true;
+  }
+
+  function docKeyParts(key) {
+    const i = key.indexOf(':');
+    return i < 0 ? { kind: key, id: '' } : { kind: key.slice(0, i), id: key.slice(i + 1) };
+  }
+
+  function browserAddr() {
+    if (browserPane === 'search') return 'search/' + browserQuery;
+    if (browserPane === 'doc') return 'doc/' + browserDocKey.replace(':', '/');
+    if (browserPane === 'site') {
+      return browserSite + (browserSite === 'news' && newsOpen ? '/' + newsOpen :
+        browserSite === 'voice' && voicePostId ? '/' + voicePostId : '');
+    }
+    return 'home';
+  }
+
+  function submitAddress(raw) {
+    if (current !== 'browser') return false;
+    let s = String(raw || '').trim().replace(/^aios:\/\//i, '').replace(/^\/+/, '');
+    if (!s || s === 'home') return goBrowserHome();
+    if (s.indexOf('search/') === 0) return submitSearch(decodeURIComponent(s.slice(7)));
+    if (s.indexOf('doc/') === 0) {
+      return openBrowserDoc(s.slice(4).replace(/\//g, ':'));
+    }
+    if (s === 'news' || s === 'voice') return showBrowserSite(s);
+    if (s.indexOf('news/') === 0) {
+      const id = Number(s.slice(5)) | 0;
+      const rec = (st.news || []).find(n => n.id === id);
+      if (!rec) { root.Audio.error(); return false; }
+      browserPush();
+      browserPane = 'site';
+      browserSite = 'news';
+      newsOpen = id;
+      renderBrowser();
+      if (els.newsBody) els.newsBody.scrollTop = 0;
+      return true;
+    }
+    if (s.indexOf('voice/') === 0) return openVoicePost(Number(s.slice(6)) | 0);
+    return submitSearch(s);
+  }
+
+  function browserTitle() {
+    if (browserPane === 'search') return '搜索 · ' + C.BROWSER.brand;
+    if (browserPane === 'doc') {
+      const parts = docKeyParts(browserDocKey);
+      if (parts.kind === 'about') return C.BROWSER.DOCS.about.title + ' · ' + C.BROWSER.brand;
+      if (parts.kind === 'guide') return '机房攻略 · ' + C.BROWSER.brand;
+      if (parts.kind === 'hot' || parts.kind === 'changelog') {
+        return C.BROWSER.DOCS[parts.kind].title + ' · ' + C.BROWSER.brand;
+      }
+      const egg = C.BROWSER.EASTER.find(e => e.id === parts.id);
+      return (egg ? egg.title : '文档') + ' · ' + C.BROWSER.brand;
+    }
+    if (browserPane === 'site') {
+      return (browserSite === 'news' ? '头条' : '声浪') + ' · ' + C.BROWSER.brand;
+    }
+    return '浏览器 · ' + C.BROWSER.brand;
+  }
+
+  function updateBrowserChrome() {
+    if (current !== 'browser') return;
+    if (els.browserAddr && document.activeElement !== els.browserAddr) {
+      els.browserAddr.value = browserAddr();
+    }
+    if (els.browserTitle) els.browserTitle.textContent = browserTitle();
+    if (els.browserBack) els.browserBack.disabled = browserPane === 'home' && !browserStack.length;
+  }
+
+  function renderBrowser() {
+    if (!els.panes) return;
+    Object.keys(els.panes).forEach(key => {
+      if (els.panes[key]) els.panes[key].classList.toggle('hidden', key !== browserPane);
+    });
+    if (els.bSiteNews) els.bSiteNews.classList.toggle('on', browserSite === 'news');
+    if (els.bSiteVoice) els.bSiteVoice.classList.toggle('on', browserSite === 'voice');
+    updateBrowserChrome();
+
+    if (browserPane === 'home') renderBrowserHome();
+    else if (browserPane === 'search') renderSearchResults();
+    else if (browserPane === 'site') {
+      if (browserSite === 'news') renderNews();
+      else renderOpinion();
+    } else if (browserPane === 'doc') renderDoc();
+  }
+
+  /* ---------- 本地搜索 ---------- */
+  const SEARCH_TYPES = {
+    site: '站内', doc: '文档', guide: '攻略', easter: '彩蛋', news: '头条', voice: '声浪',
+  };
+  const SEARCH_ORDER = ['site', 'doc', 'guide', 'easter', 'news', 'voice'];
+
+  function searchNorm(text) {
+    return String(text || '').toLowerCase().replace(/[\s·,，。！？!?、:：;；'"“”‘’()（）\[\]【】<>《》]/g, '');
+  }
+
+  function buildSearchIndex() {
+    const out = [];
+    out.push({
+      type: 'site', title: '头条 · 机房编辑部', desc: C.BROWSER.sites.news.sub,
+      kw: ['头条', '新闻', '快讯', '机房日报', '世界事件', '编辑部', '404'],
+      site: 'news',
+    });
+    out.push({
+      type: 'site', title: '声浪 · 公共时间线', desc: C.BROWSER.sites.voice.sub,
+      kw: ['声浪', '舆论', '微博', '评价', '口碑', '评论', '时间线'],
+      site: 'voice',
+    });
+    const about = C.BROWSER.DOCS.about;
+    out.push({
+      type: 'doc', title: about.title, desc: about.paras[0],
+      kw: about.kw.concat(about.paras), doc: 'about',
+    });
+    out.push({
+      type: 'doc', title: C.BROWSER.DOCS.guide.title, desc: C.BROWSER.DOCS.guide.intro,
+      kw: (C.BROWSER.DOCS.guide.kw || []).concat(['攻略', '怎么玩', '新手', '教程', '玩法', '窍门']),
+      doc: 'guide',
+    });
+    ['hot', 'changelog'].forEach(k => {
+      const d = C.BROWSER.DOCS[k];
+      out.push({
+        type: 'doc', title: d.title, desc: d.intro || d.sub,
+        kw: (d.kw || []).concat(k === 'hot' ? (C.BROWSER.HOT || []).map(h => h.title) : []),
+        doc: k,
+      });
+    });
+    C.BROWSER.GUIDES.forEach(g => {
+      const extra = g.body || [];
+      (g.steps || []).forEach(s => extra.push(s));
+      (g.sections || []).forEach(s => {
+        if (s.p) extra.push(s.p);
+        if (s.h) extra.push(s.h);
+        (s.list || []).forEach(x => extra.push(x));
+      });
+      (g.tips || []).forEach(t => extra.push(t));
+      out.push({
+        type: 'guide', title: g.title, desc: g.desc,
+        kw: g.kw.concat([g.title, g.desc, g.lead || '', g.stage || ''], extra), doc: 'guide:' + g.id,
+      });
+    });
+    C.BROWSER.EASTER.forEach(e => {
+      out.push({
+        type: 'easter', title: e.title, desc: e.desc,
+        kw: e.kw.concat([e.title, e.desc], e.body || []), doc: 'easter:' + e.id,
+      });
+    });
+    (st.news || []).forEach(n => {
+      out.push({
+        type: 'news', title: n.title || '机房快讯',
+        desc: (n.body || '') + ' · ' + newsCatName(n.cat),
+        kw: [n.title || '', n.body || '', n.tag || '', n.source || '', newsCatName(n.cat)],
+        newsId: n.id,
+      });
+    });
+    ((st.opinion && st.opinion.reviews) || []).forEach(r => {
+      out.push({
+        type: 'voice', title: r.user + '：' + String(r.text || '').slice(0, 22),
+        desc: r.text,
+        kw: [r.user, r.text, r.event || '', opinionSourceName(r.source)],
+        voiceId: r.id,
+      });
+    });
+    return out;
+  }
+
+  function searchLocal(query) {
+    const q = searchNorm(query);
+    if (!q) return [];
+    const scored = [];
+    buildSearchIndex().forEach(item => {
+      let score = 0;
+      (item.kw || []).forEach(k => {
+        const nk = searchNorm(k);
+        if (!nk) return;
+        if (nk === q) score += 60;
+        else if (nk.indexOf(q) === 0) score += 26;
+        else if (nk.indexOf(q) >= 0) score += 12;
+      });
+      const nt = searchNorm(item.title);
+      if (nt === q) score += 50;
+      else if (nt.indexOf(q) >= 0) score += 20;
+      if (searchNorm(item.desc).indexOf(q) >= 0) score += 8;
+      if (score > 0) scored.push({ item: item, score: score });
+    });
+    scored.sort((a, b) => b.score - a.score || String(a.item.title).localeCompare(String(b.item.title)));
+    return scored.slice(0, 40).map(x => x.item);
+  }
+
+  function submitSearch(raw) {
+    if (current !== 'browser') return false;
+    const q = String(raw || '').replace(/\s+/g, ' ').trim();
+    if (!q) { goBrowserHome(); return false; }
+    if (browserPane !== 'search') browserPush();
+    browserPane = 'search';
+    browserQuery = q;
+    searchTab = 'all';
+    if (els.bSearchInput) els.bSearchInput.value = q;
+    browserResults = searchLocal(q);
+    renderBrowser();
+    if (els.bResults) els.bResults.scrollTop = 0;
+    if (els.browserAddr) els.browserAddr.blur();
+    root.Audio.click();
+    return true;
+  }
+
+  function searchSuggestions() {
+    return ['订单 并发', '白嫖 3060', '内存 带宽', '散热 风扇', '续签 百亿', '制作名单', '彩蛋'];
+  }
+
+  function hitKey(item) {
+    if (!item) return '';
+    if (item.site) return 'site:' + item.site;
+    if (item.doc) return 'doc:' + item.doc;
+    if (item.newsId) return 'news:' + item.newsId;
+    if (item.voiceId) return 'voice:' + item.voiceId;
+    return '';
+  }
+
+  function hitUrl(item) {
+    if (item.site) return 'aios://' + item.site + '.local';
+    if (item.newsId) return 'aios://news.local/p/' + item.newsId;
+    if (item.voiceId) return 'aios://voice.local/p/' + item.voiceId;
+    if (item.doc) return 'aios://kb/' + item.doc.replace(':', '/') + '.html';
+    return 'aios://kb';
+  }
+
+  function highlightInto(el, text, q) {
+    const raw = String(text || '');
+    const needle = String(q || '').trim();
+    if (!needle) { el.textContent = raw; return; }
+    const lower = raw.toLowerCase();
+    const find = needle.toLowerCase();
+    let at = 0, i;
+    while ((i = lower.indexOf(find, at)) >= 0) {
+      if (i > at) el.appendChild(document.createTextNode(raw.slice(at, i)));
+      const mark = document.createElement('mark');
+      mark.textContent = raw.slice(i, i + needle.length);
+      el.appendChild(mark);
+      at = i + needle.length;
+    }
+    if (at < raw.length) el.appendChild(document.createTextNode(raw.slice(at)));
+    if (!el.childNodes.length) el.textContent = raw;
+  }
+
+  function renderSearchHeader(counts) {
+    if (!els.bQuery) return;
+    els.bQuery.innerHTML = '';
+    const form = document.createElement('form');
+    form.className = 'bq-form';
+    const brand = document.createElement('span');
+    brand.className = 'bq-brand';
+    brand.textContent = C.BROWSER.brand;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = browserQuery;
+    input.maxLength = 40;
+    input.setAttribute('aria-label', '搜索');
+    const go = document.createElement('button');
+    go.type = 'submit';
+    go.textContent = '搜索';
+    form.appendChild(brand);
+    form.appendChild(input);
+    form.appendChild(go);
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      submitSearch(input.value);
+    });
+    els.bQuery.appendChild(form);
+
+    const line = document.createElement('div');
+    line.className = 'bq-line';
+    const lead = document.createElement('span');
+    lead.textContent = '本地索引 · 约 0.04 秒 · 共 ' + browserResults.length + ' 条';
+    line.appendChild(lead);
+    const tip = document.createElement('span');
+    tip.className = 'bq-tip';
+    tip.textContent = '地址栏可直接输入 aios://doc/guide/hardware';
+    line.appendChild(tip);
+    els.bQuery.appendChild(line);
+
+    const nav = document.createElement('nav');
+    nav.className = 'bq-tabs';
+    nav.setAttribute('aria-label', '搜索结果分类');
+    const tabs = [{ id: 'all', name: '全部', n: browserResults.length }];
+    SEARCH_ORDER.forEach(type => {
+      if (counts[type]) tabs.push({ id: type, name: SEARCH_TYPES[type] || type, n: counts[type] });
+    });
+    tabs.forEach(def => {
+      const tab = document.createElement('button');
+      tab.type = 'button';
+      tab.className = 'bq-tab' + (searchTab === def.id ? ' on' : '');
+      tab.textContent = def.name;
+      const n = document.createElement('small');
+      n.textContent = String(def.n);
+      tab.appendChild(n);
+      tab.addEventListener('click', () => {
+        if (searchTab === def.id) return;
+        searchTab = def.id;
+        root.Audio.click();
+        renderSearchResults();
+        if (els.bResults) els.bResults.scrollTop = 0;
+      });
+      nav.appendChild(tab);
+    });
+    els.bQuery.appendChild(nav);
+  }
+
+  function searchResultRow(item, idx) {
+    const visited = searchVisited.has(hitKey(item));
+    const row = document.createElement('article');
+    row.className = 'bres' + (visited ? ' visited' : '');
+    row.dataset.hit = String(idx);
+
+    const url = document.createElement('div');
+    url.className = 'bres-url';
+    const fav = document.createElement('i');
+    fav.className = 'bres-fav t-' + item.type;
+    fav.textContent = ({ site: '站', doc: '档', guide: '略', easter: '蛋', news: '头', voice: '浪' })[item.type] || '页';
+    const path = document.createElement('span');
+    path.className = 'bres-path';
+    path.textContent = hitUrl(item);
+    const kind = document.createElement('em');
+    kind.textContent = SEARCH_TYPES[item.type] || item.type;
+    url.appendChild(fav);
+    url.appendChild(path);
+    url.appendChild(kind);
+
+    const title = document.createElement('button');
+    title.type = 'button';
+    title.className = 'bres-title';
+    title.dataset.hit = String(idx);
+    highlightInto(title, item.title, browserQuery);
+
+    const desc = document.createElement('p');
+    desc.className = 'bres-desc';
+    highlightInto(desc, item.desc || '', browserQuery);
+
+    row.appendChild(url);
+    row.appendChild(title);
+    row.appendChild(desc);
+    return row;
+  }
+
+  function renderSiteCluster(list) {
+    const box = document.createElement('section');
+    box.className = 'bsite-cluster';
+    const head = document.createElement('h4');
+    head.textContent = '站内站点';
+    box.appendChild(head);
+    const grid = document.createElement('div');
+    grid.className = 'bsite-cards';
+    list.forEach(item => {
+      const idx = browserResults.indexOf(item);
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'bsite-card';
+      card.dataset.hit = String(idx);
+      const top = document.createElement('span');
+      top.className = 'bsite-name';
+      highlightInto(top, item.title, browserQuery);
+      const sub = document.createElement('i');
+      sub.textContent = hitUrl(item);
+      const p = document.createElement('span');
+      p.className = 'bsite-desc';
+      p.textContent = item.desc || '';
+      card.appendChild(top);
+      card.appendChild(sub);
+      card.appendChild(p);
+      grid.appendChild(card);
+    });
+    box.appendChild(grid);
+    return box;
+  }
+
+  function renderRelated() {
+    const box = document.createElement('section');
+    box.className = 'brelated';
+    const head = document.createElement('h4');
+    head.textContent = '相关搜索';
+    box.appendChild(head);
+    const grid = document.createElement('div');
+    grid.className = 'brelated-grid';
+    const seen = new Set([browserQuery]);
+    searchSuggestions().concat([browserQuery + ' 攻略', browserQuery + ' 彩蛋']).forEach(q => {
+      if (seen.has(q) || seen.size > 8) return;
+      seen.add(q);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.q = q;
+      b.textContent = q;
+      grid.appendChild(b);
+    });
+    box.appendChild(grid);
+    return box;
+  }
+
+  function renderSearchResults() {
+    const body = els.bResults;
+    if (!body) return;
+    const counts = {};
+    browserResults.forEach(r => { counts[r.type] = (counts[r.type] || 0) + 1; });
+    renderSearchHeader(counts);
+    body.innerHTML = '';
+
+    if (!browserResults.length) {
+      const empty = document.createElement('div');
+      empty.className = 'bempty';
+      const b = document.createElement('b');
+      b.textContent = '没有找到这一页';
+      empty.appendChild(b);
+      empty.appendChild(document.createTextNode('本地索引只收机房里的东西。检查地址，或者换个词：'));
+      const sugg = document.createElement('div');
+      sugg.className = 'bsugg';
+      searchSuggestions().forEach(q => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.q = q;
+        btn.textContent = q;
+        sugg.appendChild(btn);
+      });
+      empty.appendChild(sugg);
+      body.appendChild(empty);
+      return;
+    }
+
+    if (searchTab === 'all') {
+      const sites = browserResults.filter(r => r.type === 'site');
+      if (sites.length) body.appendChild(renderSiteCluster(sites));
+    }
+    const list = searchTab === 'all'
+      ? browserResults.filter(r => r.type !== 'site')
+      : browserResults.filter(r => r.type === searchTab);
+
+    if (!list.length && searchTab === 'all') {
+      const only = document.createElement('div');
+      only.className = 'bonly-sites';
+      only.textContent = '全部命中都是站内页面，已在上面列出。';
+      body.appendChild(only);
+    }
+
+    if (list.length) {
+      const wrap = document.createElement('div');
+      wrap.className = 'bres-list';
+      list.forEach(item => wrap.appendChild(searchResultRow(item, browserResults.indexOf(item))));
+      body.appendChild(wrap);
+    } else if (searchTab !== 'all') {
+      const empty = document.createElement('div');
+      empty.className = 'bempty small';
+      empty.textContent = '这个分类下没有结果，切回「全部」看看。';
+      body.appendChild(empty);
+    }
+    body.appendChild(renderRelated());
+  }
+
+  function openSearchHit(item) {
+    if (!item) return;
+    searchVisited.add(hitKey(item));
+    if (item.site) { showBrowserSite(item.site); return; }
+    if (item.doc) { openBrowserDoc(item.doc); return; }
+    if (item.newsId) {
+      browserPush();
+      browserPane = 'site';
+      browserSite = 'news';
+      newsOpen = item.newsId;
+      renderBrowser();
+      if (els.newsBody) els.newsBody.scrollTop = 0;
+      root.Audio.paper();
+      return;
+    }
+    if (item.voiceId) {
+      browserPush();
+      browserPane = 'site';
+      browserSite = 'voice';
+      voicePostId = item.voiceId;
+      renderBrowser();
+      if (els.opinionBody) els.opinionBody.scrollTop = 0;
+      root.Audio.paper();
+    }
+  }
+
+  /* ---------- 文档 / 攻略 / 彩蛋 ---------- */
+  function docBar(kicker) {
+    return '<div class="bdoc-bar"><button type="button" class="bdoc-back" data-doc="back">← 返回</button>' +
+      '<span class="bdoc-kicker">' + kicker + '</span></div>';
+  }
+
+  function guideTable(kind) {
+    const hw = id => C.HARDWARE_BY_ID[id] || {};
+    let head = '', rows = [];
+    if (kind === 'software') {
+      head = '<tr><th>程序</th><th>写入开发点</th><th>作用</th></tr>';
+      ['order', 'optimizer', 'trainer', 'crawler', 'scheduler', 'pipeline', 'gateway'].forEach(type => {
+        const first = (C.SOFTWARE[type] || [])[0];
+        if (!first) return;
+        rows.push('<tr><td><b>' + C.SOFTWARE_TYPE_NAME[type] + ' v1</b></td><td class="num">' +
+          root.Sim.writeCost(type) + '<small>／原 ' + first.dev + '</small></td><td>' +
+          C.SOFTWARE_DESC[type] + '</td></tr>');
+      });
+    } else if (kind === 'hardware') {
+      head = '<tr><th>类型</th><th>作用</th><th>代表型号 / 关键数</th></tr>';
+      const g = hw('gpu3060'), g2 = hw('gpu4090'), g3 = hw('gpu_h200');
+      const r1 = hw('ram16'), r2 = hw('ram64'), r3 = hw('ram512');
+      const c1 = hw('cpu_i3'), c2 = hw('cpu_i9');
+      const p = hw('psu1200'), f = hw('fan2'), k = hw('cooler480');
+      const s1 = hw('ssd512'), s2 = hw('ssd32t');
+      const n2 = hw('nic2'), n4 = hw('nic4');
+      [
+        ['显卡 / NPU', '提供算力，订单、训练、点击都吃', g.name + ' ' + g.compute + ' → ' + g2.name + ' ' + g2.compute + ' → ' + g3.name + ' ' + g3.compute],
+        ['CPU', '提供算力与开发点/秒；贴内存 +10% 带宽，贴网卡 +10% 订单报酬', c1.name + ' dev ' + c1.dev + ' → ' + c2.name + ' dev ' + c2.dev],
+        ['内存', '带宽封顶有效算力', r1.name + ' ' + r1.bandwidth + ' → ' + r2.name + ' ' + r2.bandwidth + ' → ' + r3.name + ' ' + r3.bandwidth],
+        ['电源', '必须贴机箱最底行；功率不足按比例扣算力', '500W → ' + p.name + ' ' + p.watt + 'W → 4000W'],
+        ['散热', '风扇覆盖所在行和列，重叠只算 30%', f.name + ' ' + f.cooling + ' → ' + k.name + ' ' + k.cooling],
+        ['固态', '训练数据容量上限', s1.name + ' ' + s1.capacity + 'GB → ' + s2.name + ' ' + s2.capacity + 'GB'],
+        ['网卡', '订单报酬与爬虫产出加成', n2.name + ' 订单 +15% → ' + n4.name + ' 订单 +60%'],
+      ].forEach(r => {
+        rows.push('<tr><td><b>' + r[0] + '</b></td><td>' + r[1] + '</td><td class="mono">' + r[2] + '</td></tr>');
+      });
+    } else if (kind === 'gifts') {
+      head = '<tr><th>触发</th><th>补给</th><th>说明</th></tr>';
+      C.GIFTS.forEach(gf => {
+        rows.push('<tr><td class="num">累计 ' + big(gf.at) + '</td><td><b>' + gf.item + '</b></td><td>' + gf.title + '</td></tr>');
+      });
+    }
+    if (!rows.length) return '';
+    return '<div class="bdoc-tablewrap"><table class="bdoc-table"><thead>' + head +
+      '</thead><tbody>' + rows.join('') + '</tbody></table></div>';
+  }
+
+  function renderGuideIndex() {
+    const d = C.BROWSER.DOCS.guide;
+    let html = docBar('aios://doc/guide') +
+      '<article class="bdoc-card guide-index"><h2>' + d.title + '</h2>' +
+      '<div class="bdoc-sub">' + d.sub + '</div><div class="bdoc-rule"></div>' +
+      '<p class="bdoc-lead">' + d.intro + '</p>' +
+      (d.note ? '<p class="bdoc-note">' + d.note + '</p>' : '');
+    (C.BROWSER.GUIDE_GROUPS || []).forEach(group => {
+      const list = C.BROWSER.GUIDES.filter(g => g.group === group.id);
+      if (!list.length) return;
+      html += '<section class="bdoc-group"><h3>' + group.name +
+        '<small>' + list.length + ' 篇</small></h3><div class="bdoc-list">';
+      list.forEach(g => {
+        html += '<button type="button" data-doc="guide:' + g.id + '">' +
+          '<b>' + g.title + '<em>' + (g.stage || '') + '</em></b>' +
+          '<span>' + g.desc + '</span></button>';
+      });
+      html += '</div></section>';
+    });
+    html += '<div class="bdoc-footnote">攻略里的数字会随版本调整；带表格的页会直接读取当前数值。</div></article>';
+    return html;
+  }
+
+  function renderGuideDetail(g) {
+    const group = (C.BROWSER.GUIDE_GROUPS || []).find(x => x.id === g.group);
+    let html = docBar('aios://doc/guide/' + g.id) +
+      '<article class="bdoc-card guide-detail"><div class="bdoc-eyebrow">GUIDE · ' +
+      (group ? group.name : '机房') + ' · ' + (g.stage || '全程') + '</div>' +
+      '<h2>' + g.title + '</h2><div class="bdoc-rule"></div>' +
+      (g.lead ? '<p class="bdoc-lead">' + g.lead + '</p>' : '');
+    if (g.steps && g.steps.length) {
+      html += '<ol class="bdoc-steps">' + g.steps.map(s => '<li>' + s + '</li>').join('') + '</ol>';
+    }
+    (g.sections || []).forEach(sec => {
+      html += '<section class="bdoc-sec"><h3>' + sec.h + '</h3>';
+      if (sec.p) html += '<p>' + sec.p + '</p>';
+      if (sec.list) html += '<ul>' + sec.list.map(x => '<li>' + x + '</li>').join('') + '</ul>';
+      html += '</section>';
+    });
+    if (g.table) html += guideTable(g.table);
+    if (g.tips && g.tips.length) {
+      html += '<aside class="bdoc-tips"><b>小抄</b><ul>' +
+        g.tips.map(t => '<li>' + t + '</li>').join('') + '</ul></aside>';
+    }
+    if (!g.lead && !g.steps && !(g.sections || []).length) {
+      (g.body || []).forEach(p => { html += '<p>' + p + '</p>'; });
+    }
+    let act = '<button type="button" data-doc="guide">攻略目录</button>';
+    if (g.target && g.target.app) {
+      act = '<button type="button" data-doc="app:' + g.target.app + '">打开对应窗口</button>' + act;
+    } else if (g.target && g.target.page) {
+      act = '<button type="button" data-doc="page:' + g.target.page + '">去现场看看</button>' + act;
+    }
+    html += '<div class="bdoc-act">' + act + '</div>';
+    html += '<div class="bdoc-pager">' + guidePager(g) + '</div></article>';
+    return html;
+  }
+
+  function guidePager(g) {
+    const list = C.BROWSER.GUIDES;
+    const i = list.indexOf(g);
+    const prev = list[i - 1], next = list[i + 1];
+    return (prev ? '<button type="button" data-doc="guide:' + prev.id + '">← ' + prev.title + '</button>' : '<span></span>') +
+      (next ? '<button type="button" data-doc="guide:' + next.id + '">' + next.title + ' →</button>' : '<span></span>');
+  }
+
+  function renderDoc() {
+    const body = els.bDocBody;
+    if (!body) return;
+    const parts = docKeyParts(browserDocKey);
+    if (parts.kind === 'about') {
+      const d = C.BROWSER.DOCS.about;
+      body.innerHTML = docBar('aios://doc/about') +
+        '<article class="bdoc-card about-sheet"><h2>' + d.title + '</h2>' +
+        '<div class="bdoc-sub">' + d.sub + '</div><div class="bdoc-rule"></div>' +
+        d.paras.map(p => '<p>' + p + '</p>').join('') +
+        '<div class="bdoc-credits"><b>制作名单</b><span>' + (d.foot || '') + '</span></div>' +
+        '<div class="bdoc-act"><button type="button" data-doc="guide">打开机房攻略</button>' +
+        '<button type="button" data-doc="easter:maker">看制作名单</button>' +
+        '<button type="button" data-doc="search:彩蛋">搜索「彩蛋」</button></div></article>';
+      return;
+    }
+    if (parts.kind === 'hot') {
+      const d = C.BROWSER.DOCS.hot;
+      body.innerHTML = docBar('aios://doc/hot') +
+        '<article class="bdoc-card hot-sheet"><h2>' + d.title + '</h2>' +
+        '<div class="bdoc-sub">' + d.sub + '</div><div class="bdoc-rule"></div>' +
+        '<p>' + d.intro + '</p><ol class="bdoc-hotlist">' +
+        C.BROWSER.HOT.map((h, i) => '<li><button type="button" data-doc="hot:' + i + '">' +
+          '<i>' + (h.rank || i + 1) + '</i><em>' + (h.tag || '') + '</em>' +
+          '<b>' + h.title + '</b><small>' + h.heat + '</small></button></li>').join('') +
+        '</ol><div class="bdoc-act"><button type="button" data-doc="guide">去攻略目录</button>' +
+        '<button type="button" data-doc="back">返回</button></div></article>';
+      return;
+    }
+    if (parts.kind === 'changelog') {
+      const d = C.BROWSER.DOCS.changelog;
+      body.innerHTML = docBar('aios://doc/changelog') +
+        '<article class="bdoc-card changelog"><h2>' + d.title + '</h2>' +
+        '<div class="bdoc-sub">' + d.sub + '</div><div class="bdoc-rule"></div>' +
+        '<p>' + d.intro + '</p>' +
+        d.entries.map(e => '<section class="bdoc-ver"><h3>v' + e.v.replace(/^v/, '') +
+          '<time>' + e.date + '</time></h3><ul>' +
+          e.items.map(x => '<li>' + x + '</li>').join('') + '</ul></section>').join('') +
+        '<div class="bdoc-act"><button type="button" data-doc="about">关于本作</button>' +
+        '<button type="button" data-doc="back">返回</button></div></article>';
+      return;
+    }
+    if (parts.kind === 'guide' && !parts.id) {
+      body.innerHTML = renderGuideIndex();
+      return;
+    }
+    if (parts.kind === 'guide') {
+      const g = C.BROWSER.GUIDES.find(x => x.id === parts.id);
+      if (!g) { browserDocKey = 'guide'; renderDoc(); return; }
+      body.innerHTML = renderGuideDetail(g);
+      return;
+    }
+    if (parts.kind === 'easter') {
+      const e = C.BROWSER.EASTER.find(x => x.id === parts.id);
+      if (!e) { browserDocKey = 'guide'; renderDoc(); return; }
+      const locked = e.gate === 'late' && !(st && st.endless);
+      const lines = locked ? [e.locked || '档案已封存。'] : e.body;
+      body.innerHTML = docBar('aios://doc/' + browserDocKey) +
+        '<article class="bdoc-card terminal"><h2>' + e.title + '</h2>' +
+        '<div class="bdoc-sub">TERMINAL · ' + e.id.toUpperCase() + '</div><div class="bdoc-rule"></div>' +
+        lines.map(p => '<p>' + (p || '&nbsp;') + '</p>').join('') +
+        '<div class="bdoc-act"><button type="button" data-doc="search:彩蛋">继续找彩蛋</button>' +
+        '<button type="button" data-doc="back">返回</button></div></article>';
+      return;
+    }
+    browserDocKey = 'guide';
+    renderDoc();
+  }
+
+  function runDocAction(action) {
+    if (!action) return;
+    const parts = docKeyParts(action);
+    if (parts.kind === 'back') { browserBack(); return; }
+    if (parts.kind === 'guide') {
+      openBrowserDoc(parts.id ? 'guide:' + parts.id : 'guide');
+      return;
+    }
+    if (parts.kind === 'search') { submitSearch(parts.id); return; }
+    if (parts.kind === 'hot') {
+      const item = C.BROWSER.HOT[Number(parts.id)];
+      if (item) runHotTarget(item.go);
+      return;
+    }
+    if (parts.kind === 'app') {
+      if (isLocked({ key: parts.id })) {
+        root.Audio.error();
+        api.toast(parts.id === 'api'
+          ? 'API 服务：' + apiUnlockText() + '后开放。'
+          : '这个窗口还没解锁。');
+        return;
+      }
+      openWindow(parts.id, iconEls[parts.id]);
+      return;
+    }
+    if (parts.kind === 'page' && parts.id === 'tal') {
+      hardClose();
+      root.Scene.openPage('tal', 'blueprint');
+    }
   }
 
   /* ---------------- API 服务 ---------------- */
@@ -2670,13 +4195,15 @@
         updateApiChrome();
       }
     }
-    if (current === 'news') {
-      if (newsSignature() !== newsSig) renderNews();
-      else updateNewsChrome();
-    }
-    if (current === 'opinion') {
-      if (opinionSignature() !== opinionSig) renderOpinion();
-      else updateOpinionChrome();
+    if (current === 'browser') {
+      if (browserPane === 'home') syncBrowserHome();
+      else if (browserPane === 'site' && browserSite === 'news') {
+        if (newsSignature() !== newsSig) renderNews();
+        else updateNewsChrome();
+      } else if (browserPane === 'site' && browserSite === 'voice') {
+        if (opinionSignature() !== opinionSig) renderOpinion();
+        else updateOpinionChrome();
+      }
     }
     syncIcons();
   }
@@ -2784,6 +4311,11 @@
     root.Scene.openPage('hub', 'pc');
     hardClose();
     refresh(st);
+    if (name === 'news' || name === 'opinion' || name === 'voice') {
+      openWindow('browser', iconEls.browser);
+      showBrowserSite(name === 'news' ? 'news' : 'voice');
+      return;
+    }
     if (iconEls[name]) openWindow(name, iconEls[name]);
   }
 
@@ -2791,7 +4323,12 @@
     init, open, openApp, refresh, sync, closeAll,
     closeWindow, isWindowOpen, syncIcons,
     openWindow, currentWindow: () => current,
-    newsBack: () => current === 'news' && newsBackToList(true),
+    browserBack: () => browserBack(),
+    browserEsc: () => browserEsc(),
+    openBrowserSite: site => current === 'browser' && showBrowserSite(site),
+    search: q => current === 'browser' && submitSearch(q),
+    searchLocal: q => (st ? searchLocal(q) : []),
+    newsBack: () => current === 'browser' && browserSite === 'news' && !!newsOpen && browserBack(),
     orderBack: () => current === 'orders' && orderBackToList(true),
   };
 })(window);
