@@ -2608,6 +2608,12 @@ body.portrait .vd-bar .vd-me{display:none}
 .trayhint{margin-top:6px;font-size:11px;letter-spacing:.5px;color:#8B7F66}
 .rack-compact .traybox{position:sticky;bottom:8px;z-index:6;background:var(--kraft);
   box-shadow:6px 8px 0 rgba(0,0,0,.4)}
+body:not(.portrait) .rack-compact .traybox{display:flex;flex-direction:column;
+  max-height:min(210px,32vh);min-height:0}
+body:not(.portrait) .rack-compact .traybox h4{flex:none}
+body:not(.portrait) .rack-compact .tray-items{flex:1 1 auto;min-height:0;overflow-y:auto;
+  overscroll-behavior:contain;padding-right:5px;scrollbar-width:thin;scrollbar-color:#8B7F66 transparent}
+body:not(.portrait) .rack-compact .trayhint{display:none}
 
 /* ---------- 机位列表 ---------- */
 .srvlist{display:flex;flex-wrap:wrap;gap:5px}
