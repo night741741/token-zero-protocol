@@ -564,6 +564,7 @@
         syncCounter(false);
         Scene.toast('无尽运行开始 · 目标已解除，之后只累计 Token 消耗');
         Sim.save(st);
+        setTimeout(() => openSystemNote('endless'), 900);
       } else if (id === 'sandbox') {
         hideEnding();
         const renew = r.ev.find(e => e.type === 'contractRenew');
@@ -868,7 +869,7 @@
 
   function openSystemNote(id, manual) {
     if (!st || !PaperModal || !C.SYSTEM_NOTES || !C.SYSTEM_NOTES[id]) return;
-    if (!st.notes) st.notes = { act2: false, api: false };
+    if (!st.notes) st.notes = { act2: false, api: false, endless: false };
     if (!manual) {
       if (st.notes[id]) return;
       st.notes[id] = true;
@@ -1537,6 +1538,7 @@
       if (loaded) {
         if (st.act1Done && !st.notes.act2) openSystemNote('act2');
         if (Sim.apiUnlocked(st) && !st.notes.api) openSystemNote('api');
+        if (st.endless && !st.notes.endless) openSystemNote('endless');
       }
     }
 

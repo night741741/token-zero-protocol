@@ -87,7 +87,7 @@
       onboard: { tap: false, delivery: false, talent: false },
 
       /* 系统说明纸是否已读 */
-      notes: { act2: false, api: false },
+      notes: { act2: false, api: false, endless: false },
 
       /* 开场故事 / 一次性补给 */
       storySeen: false,
@@ -272,8 +272,7 @@
       return;
     }
     if (def.instant === 'warehouse') {
-      const lvl = modelLevel(st);
-      const pool = C.HARDWARE.filter(d => !d.special && d.unlock <= lvl);
+      const pool = C.HARDWARE.filter(d => !d.special && hardwareUnlocked(st, d));
       const pick = pool.length ? pool[Math.min(pool.length - 1, Math.floor(rand(st) * pool.length))] : null;
       if (pick) {
         st.warehouse.push({ uid: st.uid++, defId: pick.id });
@@ -575,13 +574,27 @@
     gpu: 'gpuPrice', npu: 'gpuPrice', ssd: 'ssdPrice',
     psu: 'psuPrice', fan: 'coolerPrice', cooler: 'coolerPrice',
   };
+  function shopEco(st) {
+    const list = C.CONST.shopEcoByContract;
+    if (st && st.endless) return list[list.length - 1];
+    const i = contractIndex(st);
+    return list[i] == null ? contractEco(st) : list[i];
+  }
   function hardwarePrice(st, def) {
     if (!def) return 0;
     const tone = (talentOn(st, 'pow', 1) ? 0.9 : 1) * (talentOn(st, 'leco', 3) ? 0.85 : 1);
     const key = HW_PRICE_KEY[def.type];
     const ev = key ? worldEventMult(st, key) : 1;
     const all = worldEventMult(st, 'hardwarePrice');
-    return Math.round(def.price * tone * ev * all * contractEco(st));
+    return Math.round(def.price * tone * ev * all * shopEco(st));
+  }
+  function hardwareUnlocked(st, def) {
+    if (!def) return false;
+    if (def.endless && !(st && st.endless)) return false;
+    return def.unlock <= modelLevel(st);
+  }
+  function hwLimit(st) {
+    return st && st.endless ? C.CONST.hwPerMachineEndless : C.CONST.hwPerMachine;
   }
 
   function modelLevel(st) {
@@ -667,7 +680,21 @@
   /* ---------------- 软件 ---------------- */
   function softwareSlots(st) {
     return C.CONST.softwareSlotsAct2 + (talentOn(st, 'sw', 3) ? 1 : 0) +
-      (contractIndex(st) >= 1 ? 1 : 0) + (contractIndex(st) >= 2 ? 1 : 0);
+      (contractIndex(st) >= 1 ? 1 : 0) + (contractIndex(st) >= 2 ? 1 : 0) +
+      (st && st.endless ? C.CONST.endlessSoftwareSlots : 0);
+  }
+  function softwareMaxV(st, type) {
+    const defs = C.SOFTWARE[type] || [];
+    let max = 0;
+    for (let i = 0; i < defs.length; i++) {
+      if (!defs[i].endless || (st && st.endless)) max = i + 1;
+    }
+    return max;
+  }
+  function softwareUpgradeLocked(st, type, v) {
+    const defs = C.SOFTWARE[type] || [];
+    const next = defs[v];
+    return !!(next && next.endless && !(st && st.endless));
   }
   function ensureSoftware(st) {
     if (!Array.isArray(st.software)) st.software = [];
@@ -724,6 +751,13 @@
   function crawlerDecayRate(st) {
     const pipe = pipelineOf(st);
     return C.CONST.crawlerDecay * (1 - (pipe ? pipe.decay : 0));
+  }
+  function crawlerDecayFloor(st) {
+    return st && st.endless ? C.CONST.crawlerDecayFloorEndless : C.CONST.crawlerDecayFloor;
+  }
+  function crawlerDecayFactor(st, sw) {
+    const age = Math.max(0, Number(sw && sw.age) || 0);
+    return Math.max(crawlerDecayFloor(st), 1 - crawlerDecayRate(st) * age);
   }
   function trainerEff(st) {
     const sw = softwareOf(st, 'trainer');
@@ -1073,12 +1107,10 @@
 
   function crawlerRate(st) {
     let rate = 0;
-    const decayRate = crawlerDecayRate(st);
     effectiveSoftware(st).forEach(sw => {
       if (sw.type !== 'crawler') return;
       const d = C.SOFTWARE.crawler[sw.v - 1];
-      const decay = Math.max(0.15, 1 - decayRate * sw.age);
-      rate += d.rate * decay;
+      rate += d.rate * crawlerDecayFactor(st, sw);
     });
     rate *= crawlerMult(st) * contractEco(st) * worldEventMult(st, 'crawler');
     if (!st.act1Done) return rate;
@@ -1838,7 +1870,9 @@
     const sw = st.software[idx];
     if (!sw) return { ok: false, reason: '空槽' };
     const defs = C.SOFTWARE[sw.type];
-    if (sw.v >= defs.length) return { ok: false, reason: '已满级' };
+    if (sw.v >= softwareMaxV(st, sw.type)) {
+      return { ok: false, reason: softwareUpgradeLocked(st, sw.type, sw.v) ? '无尽运行解锁' : '已满级' };
+    }
     const cost = upgradeCostFor(st, sw.type, sw.v);
     if (st.devPoints < cost) return { ok: false, reason: '开发点不足 · 还差 ' + Math.ceil(cost - st.devPoints) };
     st.devPoints -= cost;
@@ -2029,12 +2063,13 @@
 
     ensureSoftware(st);
     let inflow = 0;
-    st.software.forEach(sw => {
-      if (!sw || sw.type !== 'crawler') return;
+    const slots = softwareSlots(st);
+    st.software.forEach((sw, i) => {
+      if (!sw || i >= slots) return;
+      if (sw.type !== 'crawler') return;
       sw.age += dt;
       const d = C.SOFTWARE.crawler[sw.v - 1];
-      const decay = Math.max(0.15, 1 - C.CONST.crawlerDecay * sw.age);
-      inflow += d.rate * decay;
+      inflow += d.rate * crawlerDecayFactor(st, sw);
     });
     inflow *= crawlerMult(st) * (1 + ts.nicCrawler) * contractEco(st) * worldEventMult(st, 'crawler');
     const cap = dataCap(st);
@@ -2273,11 +2308,13 @@
     const lvl = modelLevel(st);
     if (def.unlock > lvl) return { ok: false, reason: '需要 L' + def.unlock };
     if (!st.act1Done) return { ok: false, reason: '第 2 幕才能装机' };
+    if (def.endless && !st.endless) return { ok: false, reason: '无尽运行解锁' };
     const idx = target == null ? st.activeServer : target;
     if (!st.servers[idx] || !st.servers[idx].owned) return { ok: false, reason: '该机位还没点亮' };
-    const room = C.CONST.hwPerMachine - hwCount(st, defId, idx);
+    const limit = hwLimit(st);
+    const room = limit - hwCount(st, defId, idx);
     if (room <= 0) {
-      return { ok: false, reason: '每台机同型号最多 ' + C.CONST.hwPerMachine + ' 件' };
+      return { ok: false, reason: '每台机同型号最多 ' + limit + ' 件' };
     }
     const price = hardwarePrice(st, def);
     const want = Math.max(1, Math.min(room, Math.floor(Number(qty) || 1)));
@@ -2331,7 +2368,8 @@
     const m = machineOf(st, machineIdx);
     const def = C.HARDWARE_BY_ID[defId];
     if (!m || !m.owned || !def) return false;
-    if (m.placed.filter(p => p.defId === defId).length >= C.CONST.hwPerMachine) return false;
+    if (def.endless && !st.endless) return false;
+    if (m.placed.filter(p => p.defId === defId).length >= hwLimit(st)) return false;
     const w = def.size[0], h = def.size[1];
     if (x < 0 || y < 0 || x + w > m.gridW || y + h > m.gridH) return false;
     for (const p of m.placed) {
@@ -2471,12 +2509,12 @@
   function candidateFor(st, type, idx, cash) {
     const m = st.servers[idx];
     const free = freeCells(m);
-    const lvl = modelLevel(st);
+    const limit = hwLimit(st);
     return C.HARDWARE
-      .filter(d => d.type === type && !d.special && d.unlock <= lvl &&
+      .filter(d => d.type === type && !d.special && hardwareUnlocked(st, d) &&
         hardwarePrice(st, d) <= cash &&
         d.size[0] * d.size[1] <= free &&
-        hwCount(st, d.id, idx) < C.CONST.hwPerMachine &&
+        hwCount(st, d.id, idx) < limit &&
         !!findSpot(st, d.id, idx))
       .sort((a, b) => hardwarePrice(st, b) - hardwarePrice(st, a))[0] || null;
   }
@@ -2803,7 +2841,7 @@
       if (!sw || typeof sw !== 'object') return null;
       const defs = C.SOFTWARE[sw.type];
       if (!defs) return null;
-      const v = Math.max(1, Math.min(defs.length, Number(sw.v) || 1));
+      const v = Math.max(1, Math.min(softwareMaxV(st, sw.type), Number(sw.v) || 1));
       return {
         type: sw.type,
         v: v,
@@ -2904,6 +2942,7 @@
     st.notes = {
       act2: nt ? nt.act2 === true : st.act1Done,
       api: nt ? nt.api === true : apiUnlocked(st),
+      endless: nt ? nt.endless === true : false,
     };
     st.storySeen = s.storySeen === true;
     const giftIds = new Set(C.GIFTS.map(g => g.id));
@@ -3036,13 +3075,13 @@
     addOpinionReview, opinionLevelBurst, opinionEventBurst,
     opinionLiked, toggleOpinionLike, opinionCommentLiked, toggleOpinionCommentLike,
     opinionNotes, addOpinionNote,
-    spendTalent, hardwarePrice, deliverySec, gpuState, deliveryName,
+    spendTalent, hardwarePrice, shopEco, hardwareUnlocked, hwLimit, deliverySec, gpuState, deliveryName,
     modelLevel, modelDef, levelName, chapter, giftById, migrateGifts,
     rigPartClick, ensureRig, rigSlots, rigSlotOf, rigClickBonus, rigCount, rigAllows, rigInstall, rigRemove,
 
     /* 软件 / 订单 */
-    softwareSlots, effectiveSoftware, optimizerMult, orderProgram, orderConcurrency,
-    orderSlotCompute, schedulerOf, pipelineOf, gatewayOf, crawlerDecayRate, trainingMult,
+    softwareSlots, softwareMaxV, softwareUpgradeLocked, effectiveSoftware, optimizerMult, orderProgram, orderConcurrency,
+    orderSlotCompute, schedulerOf, pipelineOf, gatewayOf, crawlerDecayRate, crawlerDecayFloor, crawlerDecayFactor, trainingMult,
     trainerEff, hasTrainer, crawlerRate, devRate, aiCoderRate,
     apiUnlocked, apiTierDef, apiCapacity, apiDemand, apiRate,
     apiTokenPerReq, apiPricePerReq, apiTokenRate, apiRevenueRate, upgradeApi,

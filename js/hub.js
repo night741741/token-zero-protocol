@@ -694,7 +694,8 @@
     nav.className = 'shop-tabs';
     nav.setAttribute('aria-label', '硬件分类');
     SHOP_CATEGORIES.forEach(cat => {
-      const count = C.HARDWARE.filter(d => cat.types.indexOf(d.type) >= 0 && !d.special).length;
+      const count = C.HARDWARE.filter(d => cat.types.indexOf(d.type) >= 0 && !d.special &&
+        (!d.endless || st.endless)).length;
       const tab = document.createElement('button');
       tab.type = 'button';
       tab.className = 'shop-tab' + (shopCategory === cat.id ? ' on' : '');
@@ -957,21 +958,23 @@
       const inTransit = st.deliveries.filter(x => x.item === 'hw' && x.defId === d.id && x.target === st.activeServer).length;
       const cnt = root.Sim.hwCount(st, d.id, st.activeServer);
       const price = root.Sim.hardwarePrice(st, d);
-      const room = C.CONST.hwPerMachine - cnt;
+      const limit = root.Sim.hwLimit(st);
+      const room = limit - cnt;
       let opt = {
         key: key, cls: 'next', sp: hwSpec(d),
         pr: money(price), btn: '下单',
         onClick: () => api.buyHardware(d.id, hwQty[d.id] || 1),
       };
-      if (d.unlock > lvl) {
+      if (!root.Sim.hardwareUnlocked(st, d)) {
+        const locked = d.endless && !st.endless ? '无尽运行解锁' : 'L' + d.unlock + ' 解锁';
         opt = {
-          key: key, cls: 'dim', sp: hwSpec(d) + ' · L' + d.unlock + ' 解锁',
-          badge: 'L' + d.unlock, pr: money(price), btn: '锁', disabled: true,
+          key: key, cls: 'dim', sp: hwSpec(d) + ' · ' + locked,
+          badge: d.endless ? '∞' : 'L' + d.unlock, pr: money(price), btn: '锁', disabled: true,
         };
       } else if (room <= 0) {
         opt = {
           key: key, cls: 'dim', sp: hwSpec(d),
-          badge: cnt + ' / ' + C.CONST.hwPerMachine, pr: '—', btn: '已满', disabled: true,
+          badge: cnt + ' / ' + limit, pr: '—', btn: '已满', disabled: true,
         };
       } else {
         const q = Math.max(1, Math.min(hwQty[d.id] || 1, room));
@@ -979,7 +982,7 @@
         opt = {
           key: key, cls: inTransit ? 'transit' : 'next', sp: hwSpec(d),
           pr: money(price * q), btn: '下单' + (q > 1 ? ' ×' + q : ''), funds: true,
-          badge: inTransit ? '在途' : undefined, badgeCls: 'ship',
+          badge: inTransit ? '在途' : (d.endless ? '∞' : undefined), badgeCls: 'ship',
           qty: { id: d.id, value: q },
           onClick: () => api.buyHardware(d.id, hwQty[d.id] || 1),
         };
@@ -999,9 +1002,14 @@
     const selected = SHOP_CATEGORIES.find(cat => cat.id === shopCategory) || SHOP_CATEGORIES[0];
     const groups = selected.id === 'all' ? SHOP_CATEGORIES.slice(1) : [selected];
     groups.forEach(cat => {
-      const defs = C.HARDWARE.filter(d => cat.types.indexOf(d.type) >= 0 && !d.special);
+      const defs = C.HARDWARE.filter(d => cat.types.indexOf(d.type) >= 0 && !d.special &&
+        (selected.id !== 'all' || !d.endless) && (!d.endless || st.endless));
       renderShopGroup(body, cat.name, defs, lvl);
     });
+    if (st.endless && selected.id === 'all') {
+      const endless = C.HARDWARE.filter(d => d.endless && !d.special);
+      renderShopGroup(body, '无尽目录', endless, lvl);
+    }
 
     renderNpuRow(body, lvl);
   }
@@ -1558,8 +1566,7 @@
   function swEffectText(sw) {
     if (sw.type === 'crawler') {
       const d = C.SOFTWARE.crawler[sw.v - 1];
-      const decayRate = root.Sim.crawlerDecayRate(st);
-      const decay = Math.max(0.15, 1 - decayRate * sw.age);
+      const decay = root.Sim.crawlerDecayFactor(st, sw);
       return '数据 +' + (d.rate * decay).toFixed(2) + ' GB/s · 衰减 ×' + decay.toFixed(2);
     }
     if (sw.type === 'trainer') {
@@ -1622,7 +1629,7 @@
 
     const act = document.createElement('div');
     act.className = 'hw-buy swact';
-    const next = defs[sw.v];
+    const next = sw.v < root.Sim.softwareMaxV(st, sw.type) ? defs[sw.v] : null;
     if (next) {
       const cost = root.Sim.upgradeCostFor(st, sw.type, sw.v);
       const btn = document.createElement('button');
@@ -1635,7 +1642,9 @@
     } else {
       const b = document.createElement('span');
       b.className = 'badge jit';
-      b.textContent = '满级';
+      const locked = root.Sim.softwareUpgradeLocked(st, sw.type, sw.v);
+      b.textContent = locked ? 'v' + defs[sw.v].v + ' · 无尽解锁' : '满级';
+      if (locked) b.title = '进入无尽运行后开放更高等级';
       act.appendChild(b);
     }
     const refund = Math.floor(Math.max(0, sw.spent || 0) * C.CONST.softwareRefund);
@@ -1786,7 +1795,8 @@
 
     const note = document.createElement('div');
     note.className = 'swnote';
-    note.textContent = '爬虫产出数据（随时间衰减）；优化器放大全体算力；接单程序自动接单并提高报酬；训练器用滑尺分到的算力烧 Token；调度器叠并发、扩订单板；数据管道减衰减、抬上限；API 网关提高吞吐与单价；卸下程序返还一半开发点。';
+    note.textContent = '爬虫产出数据（随时间衰减）；优化器放大全体算力；接单程序自动接单并提高报酬；训练器用滑尺分到的算力烧 Token；调度器叠并发、扩订单板；数据管道减衰减、抬上限；API 网关提高吞吐与单价；卸下程序返还一半开发点。' +
+      (st.endless ? ' 无尽运行已额外开放 2 个软件槽，爬虫可升至 v12。' : '');
     body.appendChild(note);
 
     swRefs.dev = dev.querySelector('#swDev');
@@ -2844,6 +2854,7 @@
     news: ART.news,
     voice: ART.opinion,
     guide: '<svg viewBox="0 0 32 32"><path d="M6 5.5h8a4 4 0 0 1 4 4V27a4 4 0 0 0-4-4H6z"/><path d="M26 5.5h-8a4 4 0 0 0-4 4V27a4 4 0 0 1 4-4h8z"/></svg>',
+    kb: '<svg viewBox="0 0 32 32"><path d="M7 5.5h18v21H7z"/><path d="M11 10.5h10M11 15.5h10M11 20.5h6"/><circle cx="23.5" cy="23.5" r="3"/><path d="m25.8 25.8 2 2"/></svg>',
     about: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11"/><path d="M16 14.5V23"/><circle cx="16" cy="10" r="1.4"/></svg>',
     freebies: '<svg viewBox="0 0 32 32"><path d="M5 12.5h22v6H5zM7 18.5V27h18v-8.5M16 12.5V27"/><path d="M16 12.5c-4.5 0-6.5-2-6.5-4s2.5-2.5 4-1.2c1.2 1 2.5 5.2 2.5 5.2Zm0 0c4.5 0 6.5-2 6.5-4s-2.5-2.5-4-1.2c-1.2 1-2.5 5.2-2.5 5.2Z"/></svg>',
     hot: '<svg viewBox="0 0 32 32"><path d="M16 4c1.6 5.2-3.2 6.6-3.2 10.4 0 1.8 1.1 3 2.4 3 2 0 3-1.7 2.6-4.4 2.8 2.2 4.2 4.8 4.2 7.6A8 8 0 0 1 8 20.6C8 15 12.2 11.4 16 4Z"/></svg>',
@@ -3096,6 +3107,10 @@
     if (browserPane === 'doc') {
       const parts = docKeyParts(browserDocKey);
       if (parts.kind === 'guide') return '机房攻略 · ' + C.BROWSER.brand;
+      if (parts.kind === 'kb') {
+        const article = C.BROWSER.KB.find(a => a.id === parts.id);
+        return (article ? article.title : C.BROWSER.DOCS.kb.title) + ' · ' + C.BROWSER.brand;
+      }
       if (parts.kind === 'hot' || parts.kind === 'changelog') {
         return C.BROWSER.DOCS[parts.kind].title + ' · ' + C.BROWSER.brand;
       }
@@ -3136,9 +3151,9 @@
 
   /* ---------- 本地搜索 ---------- */
   const SEARCH_TYPES = {
-    site: '站内', doc: '文档', guide: '攻略', easter: '彩蛋', news: '头条', voice: '声浪',
+    site: '站内', doc: '文档', guide: '攻略', kb: '百科', easter: '彩蛋', news: '头条', voice: '声浪',
   };
-  const SEARCH_ORDER = ['site', 'doc', 'guide', 'easter', 'news', 'voice'];
+  const SEARCH_ORDER = ['site', 'doc', 'kb', 'guide', 'easter', 'news', 'voice'];
 
   function searchNorm(text) {
     return String(text || '').toLowerCase().replace(/[\s·,，。！？!?、:：;；'"“”‘’()（）\[\]【】<>《》]/g, '');
@@ -3161,7 +3176,7 @@
       kw: (C.BROWSER.DOCS.guide.kw || []).concat(['攻略', '怎么玩', '新手', '教程', '玩法', '窍门']),
       doc: 'guide',
     });
-    ['hot', 'changelog'].forEach(k => {
+    ['hot', 'changelog', 'kb'].forEach(k => {
       const d = C.BROWSER.DOCS[k];
       out.push({
         type: 'doc', title: d.title, desc: d.intro || d.sub,
@@ -3169,8 +3184,22 @@
         doc: k,
       });
     });
+    (C.BROWSER.KB || []).forEach(a => {
+      const extra = [];
+      (a.points || []).forEach(p => extra.push(p));
+      (a.sections || []).forEach(s => {
+        if (s.h) extra.push(s.h);
+        if (s.p) extra.push(s.p);
+        (s.list || []).forEach(x => extra.push(x));
+      });
+      out.push({
+        type: 'kb', title: a.title, desc: a.answer,
+        kw: (a.aliases || []).concat([a.title, a.answer, a.myth || '', a.stage || ''], extra),
+        doc: 'kb:' + a.id,
+      });
+    });
     C.BROWSER.GUIDES.forEach(g => {
-      const extra = g.body || [];
+      const extra = (g.body || []).slice();
       (g.steps || []).forEach(s => extra.push(s));
       (g.sections || []).forEach(s => {
         if (s.p) extra.push(s.p);
@@ -3212,20 +3241,34 @@
   function searchLocal(query) {
     const q = searchNorm(query);
     if (!q) return [];
+    const asksWhat = /(有啥用|有什么用|干嘛|为什么|是什么|作用|怎么回事)/.test(q);
+    const asksHow = /(怎么|如何|步骤|顺序|先买|先写|攻略|教程)/.test(q);
     const scored = [];
     buildSearchIndex().forEach(item => {
       let score = 0;
+      let bodyHits = 0;
       (item.kw || []).forEach(k => {
         const nk = searchNorm(k);
         if (!nk) return;
         if (nk === q) score += 60;
         else if (nk.indexOf(q) === 0) score += 26;
-        else if (nk.indexOf(q) >= 0) score += 12;
+        else if (nk.indexOf(q) >= 0 && bodyHits < 3) {
+          score += 12;
+          bodyHits++;
+        }
       });
       const nt = searchNorm(item.title);
       if (nt === q) score += 50;
       else if (nt.indexOf(q) >= 0) score += 20;
       if (searchNorm(item.desc).indexOf(q) >= 0) score += 8;
+      if (score > 0 && item.type === 'kb') {
+        score += 10;
+        if ((item.kw || []).some(k => searchNorm(k) === q)) score += 120;
+        if (asksWhat) score += 35;
+        if (asksHow) score -= 8;
+      } else if (score > 0 && item.type === 'guide' && asksHow) {
+        score += 25;
+      }
       if (score > 0) scored.push({ item: item, score: score });
     });
     scored.sort((a, b) => b.score - a.score || String(a.item.title).localeCompare(String(b.item.title)));
@@ -3250,7 +3293,8 @@
   }
 
   function searchSuggestions() {
-    return ['订单 并发', '白嫖 3060', '内存 带宽', '散热 风扇', '续签 百亿', '制作名单', 'GTA6 发售', '原神启动', '彩蛋'];
+    return ['数据有啥用', '算力有什么用', '没钱怎么办', '口碑有什么用', '订单 并发', '白嫖 3060',
+      '内存 带宽', '散热 风扇', '续签 百亿', '制作名单', 'GTA6 发售', '原神启动'];
   }
 
   function hitKey(item) {
@@ -3266,7 +3310,10 @@
     if (item.site) return 'aios://' + item.site + '.local';
     if (item.newsId) return 'aios://news.local/p/' + item.newsId;
     if (item.voiceId) return 'aios://voice.local/p/' + item.voiceId;
-    if (item.doc) return 'aios://kb/' + item.doc.replace(':', '/') + '.html';
+    if (item.doc) {
+      const path = item.doc.replace(':', '/') + '.html';
+      return item.type === 'kb' ? 'aios://doc/' + path : 'aios://kb/' + path;
+    }
     return 'aios://kb';
   }
 
@@ -3320,7 +3367,7 @@
     line.appendChild(lead);
     const tip = document.createElement('span');
     tip.className = 'bq-tip';
-    tip.textContent = '地址栏可直接输入 aios://doc/guide/hardware';
+    tip.textContent = '地址栏可直接输入 aios://doc/kb/data';
     line.appendChild(tip);
     els.bQuery.appendChild(line);
 
@@ -3361,7 +3408,7 @@
     url.className = 'bres-url';
     const fav = document.createElement('i');
     fav.className = 'bres-fav t-' + item.type;
-    fav.textContent = ({ site: '站', doc: '档', guide: '略', easter: '蛋', news: '头', voice: '浪' })[item.type] || '页';
+    fav.textContent = ({ site: '站', doc: '档', guide: '略', kb: '科', easter: '蛋', news: '头', voice: '浪' })[item.type] || '页';
     const path = document.createElement('span');
     path.className = 'bres-path';
     path.textContent = hitUrl(item);
@@ -3427,7 +3474,12 @@
     const grid = document.createElement('div');
     grid.className = 'brelated-grid';
     const seen = new Set([browserQuery]);
-    searchSuggestions().concat([browserQuery + ' 攻略', browserQuery + ' 彩蛋']).forEach(q => {
+    const top = browserResults[0];
+    const kbTop = top && top.type === 'kb'
+      ? (C.BROWSER.KB || []).find(a => 'kb:' + a.id === top.doc)
+      : null;
+    const extra = kbTop ? (kbTop.queries || []) : [];
+    extra.concat(searchSuggestions(), [browserQuery + ' 攻略', browserQuery + ' 彩蛋']).forEach(q => {
       if (seen.has(q) || seen.size > 8) return;
       seen.add(q);
       const b = document.createElement('button');
@@ -3572,6 +3624,88 @@
       '</thead><tbody>' + rows.join('') + '</tbody></table></div>';
   }
 
+  function kbRefTitle(token) {
+    const parts = docKeyParts(token);
+    if (parts.kind === 'kb') {
+      const a = (C.BROWSER.KB || []).find(x => x.id === parts.id);
+      return a ? a.title : C.BROWSER.DOCS.kb.title;
+    }
+    if (parts.kind === 'guide') {
+      const g = C.BROWSER.GUIDES.find(x => x.id === parts.id);
+      return g ? g.title : '机房攻略';
+    }
+    return token;
+  }
+
+  function kbRefButton(token) {
+    return '<button type="button" data-doc="' + token + '">' + kbRefTitle(token) + '</button>';
+  }
+
+  function renderKbIndex() {
+    const d = C.BROWSER.DOCS.kb;
+    let html = docBar('aios://doc/kb') +
+      '<article class="bdoc-card kb-index"><h2>' + d.title + '</h2>' +
+      '<div class="bdoc-sub">' + d.sub + '</div><div class="bdoc-rule"></div>' +
+      '<p class="bdoc-lead">' + d.intro + '</p>' +
+      (d.note ? '<p class="bdoc-note">' + d.note + '</p>' : '');
+    (C.BROWSER.KB_GROUPS || []).forEach(group => {
+      const list = C.BROWSER.KB.filter(a => a.group === group.id);
+      if (!list.length) return;
+      html += '<section class="bdoc-group"><h3>' + group.name +
+        '<small>' + list.length + ' 条</small></h3><div class="bdoc-list kb-list">';
+      list.forEach(a => {
+        html += '<button type="button" data-doc="kb:' + a.id + '">' +
+          '<b>' + a.title + '<em>' + (a.stage || '') + '</em></b>' +
+          '<span>' + a.answer + '</span></button>';
+      });
+      html += '</div></section>';
+    });
+    html += '<div class="bdoc-footnote">按问题查；带「百科」标签的搜索结果会优先给出直接答案。</div></article>';
+    return html;
+  }
+
+  function renderKbDetail(a) {
+    const group = (C.BROWSER.KB_GROUPS || []).find(x => x.id === a.group);
+    let html = docBar('aios://doc/kb/' + a.id) +
+      '<article class="bdoc-card kb-detail"><div class="bdoc-eyebrow">KB · ' +
+      (group ? group.name : '机房') + ' · ' + (a.stage || '全程') + '</div>' +
+      '<h2>' + a.title + '</h2><div class="bdoc-rule"></div>' +
+      '<div class="kb-answer"><b>直接回答</b><p>' + a.answer + '</p></div>';
+    if (a.points && a.points.length) {
+      html += '<ul class="kb-points">' + a.points.map(p => '<li>' + p + '</li>').join('') + '</ul>';
+    }
+    (a.sections || []).forEach(sec => {
+      html += '<section class="bdoc-sec"><h3>' + sec.h + '</h3>';
+      if (sec.p) html += '<p>' + sec.p + '</p>';
+      if (sec.list) html += '<ul>' + sec.list.map(x => '<li>' + x + '</li>').join('') + '</ul>';
+      html += '</section>';
+    });
+    if (a.table) html += guideTable(a.table);
+    if (a.myth) {
+      html += '<aside class="kb-myth"><b>常见误读</b><p>' + a.myth + '</p></aside>';
+    }
+    if (a.queries && a.queries.length) {
+      html += '<section class="kb-queries"><h3>可以继续查</h3><div class="kb-chips">' +
+        a.queries.map(q => '<button type="button" data-doc="search:' + q + '">' + q + '</button>').join('') +
+        '</div></section>';
+    }
+    if (a.related && a.related.length) {
+      html += '<section class="kb-related-block"><h3>相关条目</h3><div class="kb-related">' +
+        a.related.map(kbRefButton).join('') + '</div></section>';
+    }
+    html += '<div class="bdoc-act"><button type="button" data-doc="kb">百科目录</button>' +
+      '<button type="button" data-doc="back">返回</button></div></article>';
+    return html;
+  }
+
+  function guideKbCross(g) {
+    const list = (C.BROWSER.KB || []).filter(a => (a.related || []).includes('guide:' + g.id));
+    if (!list.length) return '';
+    return '<section class="bdoc-sec kb-cross"><h3>相关百科</h3><div class="kb-related">' +
+      list.map(a => '<button type="button" data-doc="kb:' + a.id + '">' + a.title + '</button>').join('') +
+      '</div></section>';
+  }
+
   function renderGuideIndex() {
     const d = C.BROWSER.DOCS.guide;
     let html = docBar('aios://doc/guide') +
@@ -3619,6 +3753,7 @@
     if (!g.lead && !g.steps && !(g.sections || []).length) {
       (g.body || []).forEach(p => { html += '<p>' + p + '</p>'; });
     }
+    html += guideKbCross(g);
     let act = '<button type="button" data-doc="guide">攻略目录</button>';
     if (g.target && g.target.app) {
       act = '<button type="button" data-doc="app:' + g.target.app + '">打开对应窗口</button>' + act;
@@ -3667,6 +3802,16 @@
           e.items.map(x => '<li>' + x + '</li>').join('') + '</ul></section>').join('') +
         '<div class="bdoc-act"><button type="button" data-doc="easter:maker">制作名单</button>' +
         '<button type="button" data-doc="back">返回</button></div></article>';
+      return;
+    }
+    if (parts.kind === 'kb' && !parts.id) {
+      body.innerHTML = renderKbIndex();
+      return;
+    }
+    if (parts.kind === 'kb') {
+      const a = C.BROWSER.KB.find(x => x.id === parts.id);
+      if (!a) { browserDocKey = 'kb'; renderDoc(); return; }
+      body.innerHTML = renderKbDetail(a);
       return;
     }
     if (parts.kind === 'guide' && !parts.id) {
@@ -3820,6 +3965,10 @@
         root.Audio.click();
         api.toast(e.action.toast);
       }
+      return;
+    }
+    if (parts.kind === 'kb') {
+      openBrowserDoc(parts.id ? 'kb:' + parts.id : 'kb');
       return;
     }
     if (parts.kind === 'guide') {
@@ -4330,7 +4479,7 @@
     if (!def) return;
     const price = root.Sim.hardwarePrice(st, def);
     const cnt = root.Sim.hwCount(st, r.qtyCard.id, st.activeServer);
-    const room = Math.max(0, C.CONST.hwPerMachine - cnt);
+    const room = Math.max(0, root.Sim.hwLimit(st) - cnt);
     if (room <= 0) {
       if (r.pr) r.pr.textContent = '—';
       if (r.qtyVal) r.qtyVal.textContent = '1';
