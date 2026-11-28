@@ -10,6 +10,7 @@
 (function (root) {
   'use strict';
   const C = (typeof require !== 'undefined') ? require('./content.js') : root.CONTENT;
+  const cash = n => root.TokenNum ? root.TokenNum.money(n) : '¥' + Math.floor(n).toLocaleString('en-US');
 
   /* ---------------- 机位 ---------------- */
   function newServer(i) {
@@ -260,7 +261,7 @@
     if (def.instant === 'money' || def.instant === 'prepay') {
       const amount = Math.round((def.amount || 10000) * eco);
       st.money += amount;
-      log(st, '【' + def.name + '】现金 +¥' + amount.toLocaleString('en-US'));
+      log(st, '【' + def.name + '】现金 +' + cash(amount));
       ev.push({ type: 'worldInstant', kind: 'money', id: def.id, name: def.name, amount });
       return;
     }
@@ -976,11 +977,31 @@
   }
   function devRate(st) { return st && st.act1Done ? totalStats(st).devPerSec : 0; }
 
+  function aiCoderInfo(st) {
+    if (!st) {
+      return {
+        unlocked: false, level: 0, base: 0, agents: 1, agentMult: 1,
+        talentMult: 1, eventMult: 1, rate: 0, tokenRate: 0,
+        tokenPerDev: C.AI_CODER.tokenPerDev, charsPerDev: C.AI_CODER.charsPerDev,
+      };
+    }
+    const level = modelLevel(st);
+    const base = st.act1Done ? (C.AI_CODER.rates[level] || 0) : 0;
+    const agents = aiCount(st);
+    const agentMult = 1 + C.AI_CODER.agentBonus * Math.max(0, agents - 1);
+    const talentMult = talentOn(st, 'sw', 1) ? 1.3 : 1;
+    const eventMult = worldEventMult(st, 'dev');
+    const rate = base * agentMult * talentMult * eventMult;
+    return {
+      unlocked: level >= 3, level, base, agents, agentMult, talentMult, eventMult, rate,
+      tokenPerDev: C.AI_CODER.tokenPerDev,
+      charsPerDev: C.AI_CODER.charsPerDev,
+      tokenRate: rate * C.AI_CODER.tokenPerDev * burnScale(st),
+    };
+  }
+
   function aiCoderRate(st) {
-    if (!st || !st.act1Done) return 0;
-    const lvl = modelLevel(st);
-    const base = C.AI_CODER.rates[lvl] || 0;
-    return base * (talentOn(st, 'sw', 1) ? 1.3 : 1) * worldEventMult(st, 'dev');
+    return aiCoderInfo(st).rate;
   }
 
   /* ---------------- 开放 API ---------------- */
@@ -1774,7 +1795,7 @@
     if (st.burned >= reward.at && !st.starterRewardClaimed) {
       st.starterRewardClaimed = true;
       st.money += reward.money;
-      log(st, '启动资金到账：+¥' + reward.money.toLocaleString('en-US') + '（先升级 AI，再补内存和矿机）');
+      log(st, '启动资金到账：+' + cash(reward.money) + '（先升级 AI，再补内存和矿机）');
       ev.push({ type: 'starterReward', at: reward.at, money: reward.money });
     }
 
@@ -1782,7 +1803,7 @@
       if (st.burned >= m.at && st.claimed.indexOf(i) === -1) {
         st.claimed.push(i);
         st.money += m.money;
-        log(st, 'AI 接了个小活：+¥' + m.money.toLocaleString('en-US') + '（烧到 ' + humanWan(m.at) + '）');
+        log(st, 'AI 接了个小活：+' + cash(m.money) + '（烧到 ' + humanWan(m.at) + '）');
         ev.push({ type: 'milestone', at: m.at, money: m.money });
       }
     });
@@ -1831,6 +1852,17 @@
     if (!st.act1Done) return { ok: false, reason: '第 2 幕才能写代码' };
     st.devPoints += C.CONST.devPerClick;
     return { ok: true, gain: C.CONST.devPerClick };
+  }
+
+  function editorReward(st, kind) {
+    if (!st.act1Done) return { ok: false, reason: '第 2 幕才能用编辑器' };
+    const base = kind === 'line' ? C.CONST.editorLineDev
+      : kind === 'compile' ? C.CONST.editorCompileDev
+        : kind === 'key' ? C.CONST.editorKeyDev : 0;
+    if (!base) return { ok: false, reason: '未知奖励' };
+    const gain = base * (talentOn(st, 'sw', 4) ? 2 : 1);
+    st.devPoints += gain;
+    return { ok: true, gain: gain, base: base };
   }
 
   function writeCost(type) {
@@ -1995,7 +2027,7 @@
       return { type: 'orderDone', id: o.id, name: C.ORDER_TYPES[o.type].name, reward: 0, data: o.dataReward };
     }
     st.money += o.reward;
-    log(st, '完成「' + C.ORDER_TYPES[o.type].name + '」：+¥' + Math.round(o.reward).toLocaleString('en-US'));
+    log(st, '完成「' + C.ORDER_TYPES[o.type].name + '」：+' + cash(o.reward));
     return { type: 'orderDone', id: o.id, name: C.ORDER_TYPES[o.type].name, reward: o.reward, data: 0 };
   }
 
@@ -2174,10 +2206,18 @@
       if (rate > 0) {
         const dev = rate * dt;
         const want = dev * C.AI_CODER.tokenPerDev * burnScale(st);
-        const burned = burn(st, want, ev);
-        if (burned > 0) {
-          st.devPoints += dev * (burned / want);
-          checkLevelUp(st, ev);
+        if (want > 0) {
+          const burned = burn(st, want, ev);
+          if (burned > 0) {
+            const actual = dev * (burned / want);
+            st.devPoints += actual;
+            ev.push({
+              type: 'aiCode',
+              dev: actual,
+              chars: actual * C.AI_CODER.charsPerDev,
+            });
+            checkLevelUp(st, ev);
+          }
         }
       }
     }
@@ -2273,7 +2313,7 @@
     st.money -= def.price;
     st.deliveries.push({ uid: st.uid++, item: 'ram', tier: tier, remain: deliveryBaseSec(st) });
     if (!st.unlocked.shelf) st.unlocked.shelf = true;
-    log(st, '已下单内存 ×' + def.mult + ' · ¥' + def.price.toLocaleString('en-US') + '，快递 ' + deliverySec(st) + ' 秒。');
+    log(st, '已下单内存 ×' + def.mult + ' · ' + cash(def.price) + '，快递 ' + deliverySec(st) + ' 秒。');
     return { ok: true, ev: [{ type: 'order', item: 'ram', tier: tier, name: '内存 ×' + def.mult }] };
   }
 
@@ -2311,13 +2351,8 @@
     if (def.endless && !st.endless) return { ok: false, reason: '无尽运行解锁' };
     const idx = target == null ? st.activeServer : target;
     if (!st.servers[idx] || !st.servers[idx].owned) return { ok: false, reason: '该机位还没点亮' };
-    const limit = hwLimit(st);
-    const room = limit - hwCount(st, defId, idx);
-    if (room <= 0) {
-      return { ok: false, reason: '每台机同型号最多 ' + limit + ' 件' };
-    }
     const price = hardwarePrice(st, def);
-    const want = Math.max(1, Math.min(room, Math.floor(Number(qty) || 1)));
+    const want = Math.max(1, Math.floor(Number(qty) || 1));
     const afford = price > 0 ? Math.floor(st.money / price) : want;
     const count = Math.min(want, afford);
     if (count <= 0) return { ok: false, reason: '资金不足' };
@@ -2327,7 +2362,7 @@
       st.deliveries.push({ uid: st.uid++, item: 'hw', defId: def.id, target: idx, remain: deliveryBaseSec(st) });
     }
     if (!st.unlocked.shelf) st.unlocked.shelf = true;
-    log(st, '已下单 ' + def.name + (count > 1 ? ' ×' + count : '') + ' · ¥' + total.toLocaleString('en-US') + '，快递中。');
+    log(st, '已下单 ' + def.name + (count > 1 ? ' ×' + count : '') + ' · ' + cash(total) + '，快递中。');
     return {
       ok: true, price: total, unitPrice: price, count: count,
       ev: [{ type: 'hwOrder', defId: def.id, name: def.name, target: idx, count: count }],
@@ -2343,11 +2378,11 @@
     if (m.owned) return { ok: false, reason: '已拥有' };
     const lvl = modelLevel(st);
     if (srv.unlock > lvl) return { ok: false, reason: '需要 L' + srv.unlock };
-    if (st.money < srv.price) return { ok: false, reason: '资金不足 · 还差 ¥' + Math.ceil(srv.price - st.money).toLocaleString('en-US') };
+    if (st.money < srv.price) return { ok: false, reason: '资金不足 · 还差 ' + cash(srv.price - st.money) };
     st.money -= srv.price;
     m.owned = true;
     st.activeServer = idx;
-    log(st, '新机位就位：' + srv.name + ' · ¥' + srv.price.toLocaleString('en-US') + '。');
+    log(st, '新机位就位：' + srv.name + ' · ' + cash(srv.price) + '。');
     return { ok: true, ev: [{ type: 'serverBought', idx: idx, name: srv.name }] };
   }
 
@@ -2369,7 +2404,6 @@
     const def = C.HARDWARE_BY_ID[defId];
     if (!m || !m.owned || !def) return false;
     if (def.endless && !st.endless) return false;
-    if (m.placed.filter(p => p.defId === defId).length >= hwLimit(st)) return false;
     const w = def.size[0], h = def.size[1];
     if (x < 0 || y < 0 || x + w > m.gridW || y + h > m.gridH) return false;
     for (const p of m.placed) {
@@ -2439,7 +2473,7 @@
     list.splice(i, 1);
     const refund = Math.round((def ? def.price : 0) * C.CONST.sellRatio);
     st.money += refund;
-    log(st, '回收 ' + (def ? def.name : '硬件') + '：+¥' + refund.toLocaleString('en-US'));
+    log(st, '回收 ' + (def ? def.name : '硬件') + '：+' + cash(refund));
     return { ok: true, refund: refund };
   }
 
@@ -2561,7 +2595,7 @@
     if (lvl < 4) return { ok: false, reason: '需要 L4 · 还差 ' + Math.ceil((C.MODEL_LEVELS[4].at - st.burned)).toLocaleString('en-US') + ' Token' };
     if (npuCount(st) >= C.CONST.npuMax) return { ok: false, reason: '流片已达上限（' + C.CONST.npuMax + ' 块）' };
     if (st.money < C.CONST.npuStreamCost) {
-      return { ok: false, reason: '资金不足 · 还差 ¥' + Math.ceil(C.CONST.npuStreamCost - st.money).toLocaleString('en-US') };
+      return { ok: false, reason: '资金不足 · 还差 ' + cash(C.CONST.npuStreamCost - st.money) };
     }
     if (st.data < C.CONST.npuStreamData) {
       return { ok: false, reason: '数据不足 · 还差 ' + (C.CONST.npuStreamData - st.data).toFixed(1) + ' GB' };
@@ -2669,7 +2703,7 @@
     if (st.money < def.price) return { ok: false, reason: '资金不足' };
     st.money -= def.price;
     st.downloads.push({ item: 'ai', tier: next, remain: def.dl, dur: def.dl });
-    log(st, '开始部署推理代理 ×' + def.count + ' · ¥' + def.price.toLocaleString('en-US') + '。');
+    log(st, '开始部署推理代理 ×' + def.count + ' · ' + cash(def.price) + '。');
     return { ok: true, ev: [{ type: 'downloadStart', item: 'ai', tier: next }] };
   }
 
@@ -2681,7 +2715,7 @@
     if (st.money < def.price) return { ok: false, reason: '资金不足' };
     st.money -= def.price;
     st.downloads.push({ item: 'mining', tier: next, remain: def.dl, dur: def.dl });
-    log(st, '开始下载挖矿小程序 · ¥' + def.price.toLocaleString('en-US') + '。');
+    log(st, '开始下载挖矿小程序 · ' + cash(def.price) + '。');
     return { ok: true, ev: [{ type: 'downloadStart', item: 'mining', tier: next }] };
   }
 
@@ -3082,10 +3116,10 @@
     /* 软件 / 订单 */
     softwareSlots, softwareMaxV, softwareUpgradeLocked, effectiveSoftware, optimizerMult, orderProgram, orderConcurrency,
     orderSlotCompute, schedulerOf, pipelineOf, gatewayOf, crawlerDecayRate, crawlerDecayFloor, crawlerDecayFactor, trainingMult,
-    trainerEff, hasTrainer, crawlerRate, devRate, aiCoderRate,
+    trainerEff, hasTrainer, crawlerRate, devRate, aiCoderRate, aiCoderInfo,
     apiUnlocked, apiTierDef, apiCapacity, apiDemand, apiRate,
     apiTokenPerReq, apiPricePerReq, apiTokenRate, apiRevenueRate, upgradeApi,
-    code, writeSoftware, upgradeSoftware, removeSoftware, writeCost, upgradeCost, upgradeCostFor,
+    code, editorReward, writeSoftware, upgradeSoftware, removeSoftware, writeCost, upgradeCost, upgradeCostFor,
     genOrder, acceptOrder, completeOrder, seedOrders, crawlerMult,
     orderBoardCap, orderRefreshSec, orderInfo,
 

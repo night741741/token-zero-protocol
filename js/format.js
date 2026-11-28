@@ -97,5 +97,34 @@
     return (Math.round(v * 10) / 10) + '/s';
   }
 
-  root.TokenNum = { UNITS, full, compact, flip, rate };
+  /* 金额：1 亿以下精确到元并加千分位，1 亿起用中文单位 */
+  function moneyBody(n) {
+    let v = Number(n);
+    if (!isFinite(v) || v <= 0) return '0';
+    v = Math.floor(v);
+    if (v < 1e8) return v.toLocaleString('en-US');
+    if (v >= 1e52) return sci(v);
+    let i = unitAt(v);
+    if (i < 0) return v.toLocaleString('en-US');
+    let value = v / UNITS[i].v;
+    let d = decimalsFor(value);
+    let shown = round(value, d);
+    if (shown >= 10000) {
+      if (i === 0) return sci(v);
+      i--;
+      value = v / UNITS[i].v;
+      d = decimalsFor(value);
+      shown = round(value, d);
+    }
+    let text = shown.toFixed(d);
+    if (text.indexOf('.') >= 0) text = text.replace(/0+$/, '').replace(/\.$/, '');
+    const parts = text.split('.');
+    parts[0] = Number(parts[0]).toLocaleString('en-US');
+    return parts.join('.') + ' ' + UNITS[i].s;
+  }
+
+  function money(n) { return '¥' + moneyBody(n); }
+  function moneyRate(n) { return money(n) + '/s'; }
+
+  root.TokenNum = { UNITS, full, compact, flip, rate, money, moneyRate };
 })(typeof window !== 'undefined' ? window : globalThis);

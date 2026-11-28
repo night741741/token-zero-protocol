@@ -17,6 +17,7 @@
   const Drag = root.Drag;
   const $ = id => document.getElementById(id);
   const fmt = n => Math.max(0, Math.round(n)).toLocaleString('en-US');
+  const cash = n => root.TokenNum ? root.TokenNum.money(n) : '¥' + Math.floor(n).toLocaleString('en-US');
   const tokenText = n => root.TokenNum ? root.TokenNum.compact(n) : fmt(n);
   const stageEl = $('stage');
   const camEl = $('cam');
@@ -93,7 +94,7 @@
       }),
       blueprint: () => ({
         name: '天赋蓝图', cat: '底层 · 施工图',
-        lines: ['烧 Token 里程碑发 12 点前期天赋；续签百亿后再给 12 点。', '点节点盖章生效 · 纯增益，可全点满。'],
+        lines: ['烧 Token 里程碑发 13 点前期天赋；续签百亿后再给 12 点。', '点节点盖章生效 · 纯增益，可全点满。'],
         cond: '烧到 5 万 Token',
       }),
       shelf: () => ({
@@ -158,7 +159,7 @@
       name: srv.name, cat: '服务器层 · 机位 ' + (idx + 1),
       lines: [
         C.CASES[m ? m.caseTier : 1].name + ' · ' + (m ? m.gridW : 8) + '×' + (m ? m.gridH : 6) + ' 网格。',
-        '¥' + srv.price.toLocaleString('en-US') + ' · L' + srv.unlock + ' 解锁。',
+        cash(srv.price) + ' · L' + srv.unlock + ' 解锁。',
       ],
       cond: st.act1Done ? '在服务器页点「开新机位」' : '第 2 幕',
     };
@@ -253,18 +254,21 @@
       switch (e.type) {
         case 'starterReward':
           Audio.coin();
-          Scene.toast('启动奖励 +¥' + fmt(e.money) + ' · 先去应用市场升级 AI');
-          Scene.floatText(720, 236, '+¥' + fmt(e.money));
+          Scene.toast('启动奖励 +' + cash(e.money) + ' · 先去应用市场升级 AI');
+          Scene.floatText(720, 236, '+' + cash(e.money));
           UI.sync(st);
           Hub.sync(st);
           break;
         case 'autoClick':
           if (!Scene.pageOpen()) Scene.floatPc('自动 +' + fmt(e.gain), 'auto');
           break;
+        case 'aiCode':
+          if (root.Editor) root.Editor.feedAi(e.chars || 0);
+          break;
         case 'milestone':
           Audio.coin();
-          Scene.toast('里程碑 ' + fmt(e.at) + ' Token：AI 接了个小活 +¥' + fmt(e.money));
-          Scene.floatText(720, 236, '+¥' + fmt(e.money));
+          Scene.toast('里程碑 ' + fmt(e.at) + ' Token：AI 接了个小活 +' + cash(e.money));
+          Scene.floatText(720, 236, '+' + cash(e.money));
           UI.sync(st);
           Hub.refresh(st);
           break;
@@ -317,7 +321,7 @@
         case 'orderDone':
           if (e.reward >= 1500) {
             Audio.coin();
-            Scene.toast('完成「' + e.name + '」 +¥' + fmt(e.reward));
+            Scene.toast('完成「' + e.name + '」 +' + cash(e.reward));
           } else if (e.data >= 6) {
             Audio.paper();
             Scene.toast('完成「' + e.name + '」 +' + e.data.toFixed(1) + ' GB 数据');
@@ -392,8 +396,8 @@
         case 'worldInstant':
           if (e.kind === 'money') {
             Audio.coin();
-            Scene.floatText(720, 236, '+¥' + fmt(e.amount));
-            Scene.toast('【利好】' + e.name + ' · 现金 +¥' + fmt(e.amount));
+            Scene.floatText(720, 236, '+' + cash(e.amount));
+            Scene.toast('【利好】' + e.name + ' · 现金 +' + cash(e.amount));
           } else if (e.kind === 'data') {
             Scene.toast('【利好】' + e.name + ' · 训练数据 +' + fmt(e.amount) + ' GB');
           } else if (e.kind === 'warehouse') {
@@ -527,7 +531,7 @@
       st.aiCoder = st.aiCoder !== true;
       Audio.click();
       Sim.save(st);
-      Scene.toast(st.aiCoder ? 'AI 写代码已启动 · 消耗 Token 自动产出开发点' : 'AI 写代码已暂停');
+      Scene.toast(st.aiCoder ? 'AI 托管已启动 · 编辑器会自动写码，消耗 Token 换开发点' : 'AI 托管已暂停 · 编辑器回到手动敲码');
       Hub.refresh(st);
       UI.sync(st);
     },
@@ -594,7 +598,7 @@
       if (!r.ok) return fail(r.reason);
       Audio.paper();
       Scene.toast('已下单 ' + C.HARDWARE_BY_ID[defId].name + (r.count > 1 ? ' ×' + r.count : '') +
-        ' · ¥' + fmt(r.price) + ' · ' + Sim.deliverySec(st) + ' 秒后到快递架。');
+        ' · ' + cash(r.price) + ' · ' + Sim.deliverySec(st) + ' 秒后到快递架。');
       handleEvents(r.ev || []);
       Hub.refresh(st);
       Delivery.sync(st, 0, true);
@@ -618,7 +622,7 @@
       const r = Sim.sellHardware(st, uid, st.activeServer);
       if (!r.ok) { fail(r.reason); return false; }
       Audio.coin();
-      Scene.toast('回收硬件 · +¥' + fmt(r.refund));
+      Scene.toast('回收硬件 · +' + cash(r.refund));
       Stage.render(st);
       Hub.refresh(st);
       UI.sync(st);
@@ -1466,6 +1470,7 @@
     Stage.render(st);
 
     Hub.init(st, api);
+    if (root.Editor) root.Editor.init(st, api);
     Rig.init(st, api);
     Delivery.init(st, api);
     Rig.render(st);
@@ -1587,7 +1592,7 @@
         UI.sync(st);
         UI.renderJournal(st);
       },
-      Sim, Scene, Stage, Drag, Hub, Rig, Delivery, Pending, PaperModal, UI, api,
+      Sim, Scene, Stage, Drag, Hub, Editor: root.Editor, Rig, Delivery, Pending, PaperModal, UI, api,
       camera: { state: cam, min: CAM.min, max: CAM.max, reset: camReset, zoomAt: camZoomAt, allowed: camAllowed },
       coach: { current: () => coachCur, queue: () => coachQueue.slice(), show: coachQueueKey, hide: coachHide, done: coachDone },
       mobile: {

@@ -126,7 +126,7 @@
   function sync(state) {
     if (!state) return;
     st = state;
-    setText(el.money, 'money', '¥' + Math.floor(st.money).toLocaleString('en-US'));
+    setText(el.money, 'money', Num ? Num.money(st.money) : '¥' + Math.floor(st.money).toLocaleString('en-US'));
     setText(el.data, 'data', dataLabel(st.data));
     const con = root.Sim.currentContract(st);
     setText(el.hudTitle, 'hudTitle', st.endless ? '无尽运行 · 目标已解除' : con.def.name);
@@ -266,7 +266,9 @@
     cols: [220, 490, 760, 1030],
     nodeX: 25, nodeW: 200, nodeH: 88,
     tops: [176, 318, 460],
+    tops4: [176, 318, 460, 602],
     comment: { y: 100, w: 250, h: 472 },
+    comment4H: 600,
   };
 
   function bpWire(x1, y1, x2, y2, cls) {
@@ -308,23 +310,25 @@
     talentTabCols().forEach((col, ci) => {
       const defs = C.TALENTS[col.key];
       const x = BP.cols[ci];
+      const tops = defs.length > BP.tops.length ? BP.tops4 : BP.tops;
+      const commentH = defs.length > BP.tops.length ? BP.comment4H : BP.comment.h;
       const com = document.createElement('div');
       com.className = 'tcomment ' + col.cls;
       com.dataset.key = col.key;
       com.dataset.max = String(defs.length);
       com.style.cssText = 'left:' + x + 'px;top:' + BP.comment.y + 'px;width:' +
-        BP.comment.w + 'px;height:' + BP.comment.h + 'px';
+        BP.comment.w + 'px;height:' + commentH + 'px';
       com.innerHTML = '<div class="ch"><span>' + col.name + '</span><em>0 / ' + defs.length + '</em></div>';
       el.talCols.appendChild(com);
 
-      const firstY = BP.tops[0];
+      const firstY = tops[0];
       paths += bpWire(BP.root.x + BP.root.w, BP.root.y + BP.root.h / 2,
         x + BP.nodeX, firstY + BP.nodeH / 2, 'tw-exec');
 
       defs.forEach((node, i) => {
-        const y = BP.tops[i];
+        const y = tops[i];
         if (i) {
-          paths += bpWire(x + BP.nodeX + BP.nodeW / 2, BP.tops[i - 1] + BP.nodeH,
+          paths += bpWire(x + BP.nodeX + BP.nodeW / 2, tops[i - 1] + BP.nodeH,
             x + BP.nodeX + BP.nodeW / 2, y, 'tw-' + col.key);
         }
         const n = document.createElement('div');

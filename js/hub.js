@@ -89,7 +89,8 @@
   ];
 
   const fmt = n => Math.max(0, Math.round(n)).toLocaleString('en-US');
-  const money = n => '¥' + Math.floor(n).toLocaleString('en-US');
+  const money = n => root.TokenNum ? root.TokenNum.money(n) : '¥' + Math.floor(n).toLocaleString('en-US');
+  const moneyRate = n => root.TokenNum ? root.TokenNum.moneyRate(n) : money(n) + '/s';
   const wan = n => (n >= 10000 ? (n / 10000).toFixed(n % 10000 ? 1 : 0) + ' 万' : String(n));
   const apiUnlockText = () => {
     const def = C.MODEL_LEVELS[C.API_SERVICE.unlockLevel];
@@ -102,6 +103,7 @@
     apps: '<svg viewBox="0 0 32 32"><rect x="5" y="5" width="9" height="9" rx="2"/><rect x="18" y="5" width="9" height="9" rx="2"/><rect x="5" y="18" width="9" height="9" rx="2"/><rect x="18" y="18" width="9" height="9" rx="2"/></svg>',
     orders: '<svg viewBox="0 0 32 32"><path d="M11 6h10a2 2 0 0 1 2 2v18a2 2 0 0 1-2 2H11a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"/><path d="M13 6V4.5h6V6"/><path d="M13 13h6M13 18h6M13 23h3"/></svg>',
     software: '<svg viewBox="0 0 32 32"><rect x="4" y="6" width="24" height="20" rx="2.5"/><path d="M9.5 12.5 14 16l-4.5 3.5M16.5 20.5h6"/></svg>',
+    editor: '<svg viewBox="0 0 32 32"><path d="m12 9-6 7 6 7M20 9l6 7-6 7M18.5 6l-5 20"/></svg>',
     api: '<svg viewBox="0 0 32 32"><path d="M8 21a4.5 4.5 0 0 1 .8-8.9A6 6 0 0 1 20.4 12 4 4 0 0 1 24 19.8V21"/><path d="M12 25.5 16 29l4-3.5M16 22v7"/></svg>',
     news: '<svg viewBox="0 0 32 32"><path d="M5 7h22v19H5z"/><path d="M8 11h9M8 15h9M8 19h6M20 11h3M20 15h3M20 19h3M20 23h3M8 23h6"/></svg>',
     opinion: '<svg viewBox="0 0 32 32"><path d="M6 6.5h20a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-9l-6.5 5v-5H6a2 2 0 0 1-2-2v-12a2 2 0 0 1 2-2Z"/><path d="M10 13.5h12M10 18h8"/></svg>',
@@ -114,6 +116,7 @@
     { key: 'apps', name: '应用市场', sub: '代理与矿机' },
     { key: 'orders', name: '订单', sub: '第 2 幕' },
     { key: 'software', name: '软件', sub: '第 2 幕' },
+    { key: 'editor', name: '编辑器', sub: '敲代码' },
     { key: 'api', name: 'API 服务', sub: C.MODEL_LEVELS[C.API_SERVICE.unlockLevel].name.split(' · ')[0] + ' · 开放模型' },
     { key: 'browser', name: '浏览器', sub: '头条 / 声浪' },
     { key: 'trash', name: '回收站', sub: '硬件回收' },
@@ -125,7 +128,7 @@
   ];
 
   function isLocked(def) {
-    if (def.key === 'orders' || def.key === 'software') return !(st && st.unlocked.orders);
+    if (def.key === 'orders' || def.key === 'software' || def.key === 'editor') return !(st && st.unlocked.orders);
     if (def.key === 'api') return !(st && root.Sim.apiUnlocked(st));
     return false;
   }
@@ -226,14 +229,16 @@
       root.Audio.error();
       api.toast(def.key === 'api'
         ? 'API 服务：' + apiUnlockText() + '后开放。'
-        : def.name + '：拆开 RTX 3060 后才会亮。');
+        : def.key === 'editor'
+          ? '编辑器：拆开 RTX 3060、进入第 2 幕后才能用。'
+          : def.name + '：拆开 RTX 3060 后才会亮。');
       return;
     }
     toggleWindow(def.key);
   }
 
   function bindShell() {
-    ['shop', 'apps', 'orders', 'software', 'api', 'browser'].forEach(name => {
+    ['shop', 'apps', 'orders', 'software', 'editor', 'api', 'browser'].forEach(name => {
       const win = $('win-' + name);
       if (!win) return;
       const x = win.querySelector('.x');
@@ -496,6 +501,7 @@
     else if (current === 'apps') renderApps();
     else if (current === 'orders') renderOrders();
     else if (current === 'software') renderSoftware();
+    else if (current === 'editor' && root.Editor) root.Editor.render(st);
     else if (current === 'api') renderApi();
     else if (current === 'browser') renderBrowser();
   }
@@ -589,6 +595,7 @@
     if (!body) return;
     body.innerHTML = '';
     rows = {};
+    lastChrome = {};
     if (st.act1Done) { renderAct2Shop(body); return; }
 
     const shipSec = root.Sim.deliverySec(st);
@@ -956,10 +963,7 @@
     defs.forEach(d => {
       const key = 'hw:' + d.id;
       const inTransit = st.deliveries.filter(x => x.item === 'hw' && x.defId === d.id && x.target === st.activeServer).length;
-      const cnt = root.Sim.hwCount(st, d.id, st.activeServer);
       const price = root.Sim.hardwarePrice(st, d);
-      const limit = root.Sim.hwLimit(st);
-      const room = limit - cnt;
       let opt = {
         key: key, cls: 'next', sp: hwSpec(d),
         pr: money(price), btn: '下单',
@@ -971,13 +975,8 @@
           key: key, cls: 'dim', sp: hwSpec(d) + ' · ' + locked,
           badge: d.endless ? '∞' : 'L' + d.unlock, pr: money(price), btn: '锁', disabled: true,
         };
-      } else if (room <= 0) {
-        opt = {
-          key: key, cls: 'dim', sp: hwSpec(d),
-          badge: cnt + ' / ' + limit, pr: '—', btn: '已满', disabled: true,
-        };
       } else {
-        const q = Math.max(1, Math.min(hwQty[d.id] || 1, room));
+        const q = Math.max(1, Math.min(HW_BATCH_MAX, hwQty[d.id] || 1));
         hwQty[d.id] = q;
         opt = {
           key: key, cls: inTransit ? 'transit' : 'next', sp: hwSpec(d),
@@ -1043,7 +1042,7 @@
     if (lvl < 4) {
       opt = {
         key: 'npu', cls: 'dim', sp: spec + ' · L4 解锁',
-        badge: 'L4', pr: '¥' + C.CONST.npuStreamCost.toLocaleString('en-US'),
+        badge: 'L4', pr: money(C.CONST.npuStreamCost),
         btn: '锁', disabled: true,
       };
     } else if (made >= max) {
@@ -1055,7 +1054,7 @@
       const enough = st.money >= C.CONST.npuStreamCost && st.data >= C.CONST.npuStreamData;
       opt = {
         key: 'npu', cls: enough ? 'next' : '', sp: spec,
-        badge: made + ' / ' + max, pr: '¥' + C.CONST.npuStreamCost.toLocaleString('en-US'),
+        badge: made + ' / ' + max, pr: money(C.CONST.npuStreamCost),
         btn: '流片', disabled: !enough, onClick: () => api.streamNpu(),
       };
     }
@@ -1701,7 +1700,7 @@
   function swSignature() {
     const slots = root.Sim.softwareSlots(st);
     return st.software.slice(0, slots).map(x => x ? x.type + x.v : '-').join(',') + '|' + slots +
-      '|L' + root.Sim.modelLevel(st) + '|' + (st.aiCoder === true ? 1 : 0);
+      '|L' + root.Sim.modelLevel(st);
   }
 
   function renderSoftware() {
@@ -1729,31 +1728,13 @@
       '<div><span>接单并发</span><b id="swConc">' + root.Sim.orderConcurrency(st) + '</b></div>';
     const codeBtn = document.createElement('button');
     codeBtn.className = 'buy codebtn';
-    codeBtn.textContent = '写代码 +' + C.CONST.devPerClick;
-    codeBtn.addEventListener('click', () => api.code());
+    codeBtn.textContent = '去编辑器敲代码';
+    codeBtn.addEventListener('click', () => {
+      root.Audio.click();
+      root.Hub.openApp('editor');
+    });
     dev.appendChild(codeBtn);
     body.appendChild(dev);
-
-    const lvl = root.Sim.modelLevel(st);
-    const aiOn = st.aiCoder === true;
-    const aiUnlocked = lvl >= 3;
-    const aiRate = root.Sim.aiCoderRate(st);
-    const perDev = C.AI_CODER.tokenPerDev;
-    body.appendChild(sec('AI 写代码 · 自动开发'));
-    body.appendChild(makeRow({
-      key: 'aiCoder',
-      cls: aiUnlocked ? (aiOn ? 'owned' : 'next') : 'dim',
-      nm: 'AI 写代码 · ' + (aiOn ? '开' : '关'),
-      sp: aiUnlocked
-        ? '每秒 +' + aiRate.toFixed(1) + ' 开发点 · 每点 ' + perDev + ' Token（约 ' + Math.round(aiRate * perDev) + ' Token/s）'
-        : 'L3 · 自写软件 解锁 · 累计烧 2,000 万 Token',
-      badge: aiUnlocked ? (aiOn ? '运行中' : '待机') : 'L3',
-      badgeCls: aiOn ? 'jit' : '',
-      pr: '—',
-      btn: aiUnlocked ? (aiOn ? '停止' : '启动') : '锁',
-      disabled: !aiUnlocked,
-      onClick: () => api.toggleAiCoder(),
-    }));
 
     const selected = SOFTWARE_CATEGORIES.find(cat => cat.id === softwareCategory) || SOFTWARE_CATEGORIES[0];
     body.appendChild(sec('软件槽 · 穿孔卡'));
@@ -1796,7 +1777,7 @@
     const note = document.createElement('div');
     note.className = 'swnote';
     note.textContent = '爬虫产出数据（随时间衰减）；优化器放大全体算力；接单程序自动接单并提高报酬；训练器用滑尺分到的算力烧 Token；调度器叠并发、扩订单板；数据管道减衰减、抬上限；API 网关提高吞吐与单价；卸下程序返还一半开发点。' +
-      (st.endless ? ' 无尽运行已额外开放 2 个软件槽，爬虫可升至 v12。' : '');
+      (st.endless ? ' 无尽运行已额外开放 4 个软件槽，爬虫可升至 v12。' : '');
     body.appendChild(note);
 
     swRefs.dev = dev.querySelector('#swDev');
@@ -4164,7 +4145,7 @@
     const pay = document.createElement('span');
     pay.className = 'api-q-pay';
     const yen = document.createElement('b');
-    yen.textContent = '+¥' + fmt(rec.yen);
+    yen.textContent = '+' + money(rec.yen);
     const tok = document.createElement('small');
     tok.textContent = rec.tokens + ' Token';
     pay.appendChild(yen); pay.appendChild(tok);
@@ -4253,7 +4234,7 @@
       setText(apiRefs.reqSub, '上限 ' + cap + ' · 需求 ' + demand + ' 单/s' +
         (gw ? ' · 网关 ×' + gw.throughput : ''), 'apiReqSub');
     }
-    if (apiRefs.yenRate) setText(apiRefs.yenRate, '¥' + fmt(rate * price), 'apiYenRate');
+    if (apiRefs.yenRate) setText(apiRefs.yenRate, money(rate * price), 'apiYenRate');
     if (apiRefs.yenSub) setText(apiRefs.yenSub, '每单 ' + money(price), 'apiYenSub');
     if (apiRefs.tokRate) setText(apiRefs.tokRate, Num ? Num.rate(rate * perReq) : fmt(rate * perReq) + '/s', 'apiTokRate');
     if (apiRefs.tokSub) setText(apiRefs.tokSub, perReq + ' Token/单', 'apiTokSub');
@@ -4340,7 +4321,7 @@
     setText(els.tbMem, '内存 ×' + root.Sim.ramMult(st), 'tbMem');
     setText(els.tbProc, '代理 ' + ai, 'tbProc');
     setText(els.tbBurn, '自动 ' + (Num ? Num.rate(auto) : auto + '/s'), 'tbBurn');
-    setText(els.tbMine, '挖矿 ¥' + fmt(mine) + '/s', 'tbMine');
+    setText(els.tbMine, '挖矿 ' + moneyRate(mine), 'tbMine');
     setText(els.tbToken, st.endless ? '累计消耗 ' + big(st.burned) : '剩余 ' + big(st.token), 'tbToken');
     if (els.tbAi) {
       const showAi = st.act1Done && root.Sim.modelLevel(st) >= 4;
@@ -4401,6 +4382,7 @@
       if (swSignature() !== swSig) renderSoftware();
       else updateSwChrome();
     }
+    if (current === 'editor' && root.Editor) root.Editor.sync(st);
     if (current === 'api') {
       if (apiSignature() !== apiSig) renderApi();
       else {
@@ -4466,8 +4448,10 @@
     return st.downloads.find(d => d.item === item) || null;
   }
 
+  const HW_BATCH_MAX = 999;
+
   function stepHwQty(id, delta) {
-    hwQty[id] = Math.max(1, (Number(hwQty[id]) || 1) + delta);
+    hwQty[id] = Math.max(1, Math.min(HW_BATCH_MAX, (Number(hwQty[id]) || 1) + delta));
     const r = rows['hw:' + id];
     if (r) updateHwQtyRow(r);
     root.Audio.click();
@@ -4478,20 +4462,9 @@
     const def = C.HARDWARE_BY_ID[r.qtyCard.id];
     if (!def) return;
     const price = root.Sim.hardwarePrice(st, def);
-    const cnt = root.Sim.hwCount(st, r.qtyCard.id, st.activeServer);
-    const room = Math.max(0, root.Sim.hwLimit(st) - cnt);
-    if (room <= 0) {
-      if (r.pr) r.pr.textContent = '—';
-      if (r.qtyVal) r.qtyVal.textContent = '1';
-      if (r.qtyMinus) r.qtyMinus.disabled = true;
-      if (r.qtyPlus) r.qtyPlus.disabled = true;
-      if (r.btn) { r.btn.disabled = true; r.btn.textContent = '已满'; }
-      if (r.row) r.row.classList.remove('poor');
-      return;
-    }
-    const afford = price > 0 ? Math.floor(st.money / price) : room;
-    const cap = Math.max(0, Math.min(room, afford));
-    let q = Math.max(1, Math.min(Number(hwQty[r.qtyCard.id]) || 1, room));
+    const afford = price > 0 ? Math.floor(st.money / price) : HW_BATCH_MAX;
+    const cap = Math.max(0, Math.min(HW_BATCH_MAX, afford));
+    let q = Math.max(1, Math.min(Number(hwQty[r.qtyCard.id]) || 1, HW_BATCH_MAX));
     if (cap >= 1) q = Math.min(q, cap);
     else q = 1;
     hwQty[r.qtyCard.id] = q;

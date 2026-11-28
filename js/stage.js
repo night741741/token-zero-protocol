@@ -21,7 +21,7 @@
   let gridKey = '';
   let api = {};
 
-  const money = n => '¥' + Math.floor(n).toLocaleString('en-US');
+  const money = n => root.TokenNum ? root.TokenNum.money(n) : '¥' + Math.floor(n).toLocaleString('en-US');
 
   function machine(state) { return state.servers[state.activeServer]; }
   function isOpen() {

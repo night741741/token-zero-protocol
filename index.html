@@ -249,7 +249,7 @@
         <div class="hud-it"><span>AI</span><b id="hudAi">×1</b></div>
         <div class="hud-it"><span>自动</span><b id="hudAuto">0/s</b></div>
         <div class="hud-it hud-rate" title="最近 1 秒平均消耗，含点击与被动燃烧"><span>消耗</span><b id="hudBurnRate">0/s</b></div>
-        <div class="hud-it"><span>天赋点</span><b id="hudTalent">0 / 12</b></div>
+        <div class="hud-it"><span>天赋点</span><b id="hudTalent">0 / 13</b></div>
         <div class="hud-title"><span id="hudTitleText">一亿 Token 清零协议</span><i id="hudAct">第 1 幕 · 底层单机</i></div>
         <div class="hud-right">
           <button class="hbtn" id="hMute">声音 开</button>
@@ -331,7 +331,40 @@
             <div class="win" id="win-software" style="left:152px;top:28px;width:900px;height:560px">
               <div class="tb"><span>软件 · 开发台</span><span class="tb-right"><button type="button" class="tb-help" data-help="act2" title="查看订单、数据与软件说明">说明</button><span class="dots"><i></i><i></i><i></i><button class="x" title="关闭">×</button></span></span></div>
               <div class="wbody scroll" id="swBody"></div>
-              <div class="wfoot" id="swFoot">开发点挂机增长 · 手写 +2 · L3 起可让 AI 代写</div>
+              <div class="wfoot" id="swFoot">开发点挂机增长 · 去编辑器敲代码 · L3 起在编辑器里开 AI 托管</div>
+            </div>
+
+            <div class="win" id="win-editor" style="left:152px;top:28px;width:900px;height:560px">
+              <div class="tb"><span>编辑器 · 零号 IDE</span><span class="dots"><i></i><i></i><i></i><button class="x" title="关闭">×</button></span></div>
+              <div class="wbody editor-body" id="editorBody">
+                <div class="ed-shell">
+                  <div class="ed-head">
+                    <span class="ed-name"><i id="edLang">JS</i><span id="edName">zero-core.js</span></span>
+                    <span class="ed-round" id="edRound">第 1 圈 · 文件 1/3 · 0 / 89 行</span>
+                  </div>
+                  <div class="ed-code" id="edCode" tabindex="0" aria-label="代码输入区">
+                    <div class="ed-lines" id="edLines"></div>
+                    <div class="ed-empty" id="edEmpty">随便按字母键，代码会自己往下打</div>
+                  </div>
+                  <div class="ed-term">
+                    <div class="ed-term-h"><span>编译终端</span><span id="edTermLang">NODE</span><span>OUTPUT</span></div>
+                    <div class="ed-ime" id="edIme" role="status" aria-live="polite">
+                      <span class="ed-ime-k">输入法</span>
+                      <span class="ed-ime-t">请用英文输入法；中文输入法直接按字母键也能出码。</span>
+                    </div>
+                    <pre class="ed-term-out" id="edTermOut"></pre>
+                  </div>
+                  <div class="ed-bar">
+                    <div class="ed-gain" id="edGain">开发点 +1/键 · +3/行 · +10/文件</div>
+                    <div class="ed-ai">
+                      <span class="ed-ai-info" id="edAiInfo">L3 解锁 AI 托管</span>
+                      <button type="button" class="ed-ai-btn" id="edAiBtn" disabled>AI · L3 解锁</button>
+                    </div>
+                    <div class="ed-tip">A–Z 出码 · 自动换行 · AI 托管循环</div>
+                  </div>
+                </div>
+              </div>
+              <div class="wfoot" id="edFoot">三份代码循环编译 · 关闭窗口不丢进度 · AI 托管随模型与代理提速</div>
             </div>
 
             <div class="win" id="win-api" style="left:152px;top:28px;width:900px;height:560px">
@@ -553,19 +586,19 @@
           <div class="phead">
             <button class="pback" data-back>返回<span class="esc"> · ESC</span></button>
             <div class="pttl">天赋蓝图</div>
-            <div class="phint">前期 12 点 · 续签后再给 12 点 · 24 点恰好点满八条树</div>
-            <div class="pchips"><span class="chip" id="talChip1">可用 0 / 12</span><span class="chip" id="talChip2">下一里程碑 5 万</span><span class="chip">盖章即生效</span></div>
+            <div class="phint">前期 13 点 · 续签后再给 12 点 · 25 点恰好点满八条树</div>
+            <div class="pchips"><span class="chip" id="talChip1">可用 0 / 13</span><span class="chip" id="talChip2">下一里程碑 5 万</span><span class="chip">盖章即生效</span></div>
           </div>
           <div class="talents">
             <div class="bpttl">TALENT_GRAPH · 天赋蓝图<small>BLUEPRINT / 前期四系 · 续签四系 · 纯增益 · 无失败</small><span class="trecommend">前期推荐点击系：先 ×2，再 ×4，最后自动点击</span></div>
             <div class="tal-tabs">
-              <button type="button" class="tal-tab on" data-tal-tab="early">前期蓝图<small>烧 Token · 12 点</small></button>
+              <button type="button" class="tal-tab on" data-tal-tab="early">前期蓝图<small>烧 Token · 13 点</small></button>
               <button type="button" class="tal-tab locked" data-tal-tab="late">续签蓝图<small>百亿后解锁 · 12 点</small></button>
             </div>
             <div class="tpts" id="talPts">可用天赋点 0</div>
             <div class="tcols tgraph" id="talCols"></div>
             <div class="tnote">每系按顺序点亮 · 点一下盖章生效 · 沙盒里也能全点满</div>
-            <div class="bpgridtag">GRID 24PX · LINK 12 · READ ONLY</div>
+            <div class="bpgridtag">GRID 24PX · LINK 13 · READ ONLY</div>
             <div class="tmlist" id="talMilestones"></div>
           </div>
         </section>
@@ -647,6 +680,7 @@
 <script src="js/stage.js"></script>
 <script src="js/drag.js"></script>
 <script src="js/hub.js"></script>
+<script src="js/editor.js"></script>
 <script src="js/rig.js"></script>
 <script src="js/delivery.js"></script>
 <script src="js/pending.js"></script>
