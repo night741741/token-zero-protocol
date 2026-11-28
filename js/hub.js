@@ -5,6 +5,7 @@
 (function (root) {
   'use strict';
   const C = root.CONTENT;
+  const Num = root.TokenNum;
   const $ = id => document.getElementById(id);
 
   let st = null, api = null;
@@ -94,12 +95,7 @@
     const def = C.MODEL_LEVELS[C.API_SERVICE.unlockLevel];
     return def.name + '（累计烧 ' + wan(def.at) + ' Token）';
   };
-  const big = n => {
-    if (n >= 1000000000000) return (n / 1000000000000).toFixed(1) + ' 万亿';
-    if (n >= 100000000) return (n / 100000000).toFixed(1) + ' 亿';
-    if (n >= 10000) return (n / 10000).toFixed(1) + ' 万';
-    return fmt(n);
-  };
+  const big = n => Num ? Num.compact(n) : fmt(n);
 
   const ART = {
     shop: '<svg viewBox="0 0 32 32"><path d="M3.5 6.5h3.2l3 13.2a2.2 2.2 0 0 0 2.2 1.7h9.4a2.2 2.2 0 0 0 2.1-1.6l2.1-8.3H8.2"/><circle cx="13" cy="26" r="1.7"/><circle cx="23" cy="26" r="1.7"/></svg>',
@@ -2857,10 +2853,9 @@
 
   function browserMetaText() {
     if (!st) return 'AI-OS 0.9 · 本地索引';
+    if (st.endless) return '无尽运行 · 累计消耗 ' + big(st.burned);
     const num = root.Sim.chapter(st).num;
-    return '第 ' + num + ' 幕 · ' + (st.endless
-      ? '累计消耗 ' + big(st.burned)
-      : '剩余 ' + big(st.token) + ' Token');
+    return '第 ' + num + ' 幕 · 剩余 ' + big(st.token) + ' Token';
   }
 
   function browserShortcutLocked(def) {
@@ -4111,11 +4106,11 @@
     }
     if (apiRefs.yenRate) setText(apiRefs.yenRate, '¥' + fmt(rate * price), 'apiYenRate');
     if (apiRefs.yenSub) setText(apiRefs.yenSub, '每单 ' + money(price), 'apiYenSub');
-    if (apiRefs.tokRate) setText(apiRefs.tokRate, fmt(rate * perReq) + '/s', 'apiTokRate');
+    if (apiRefs.tokRate) setText(apiRefs.tokRate, Num ? Num.rate(rate * perReq) : fmt(rate * perReq) + '/s', 'apiTokRate');
     if (apiRefs.tokSub) setText(apiRefs.tokSub, perReq + ' Token/单', 'apiTokSub');
     if (apiRefs.totalReq) setText(apiRefs.totalReq, Math.floor(st.apiRequests).toLocaleString('en-US'), 'apiTotalReq');
     if (apiRefs.totalRev) setText(apiRefs.totalRev, money(st.apiRevenue), 'apiTotalRev');
-    if (apiRefs.totalBurn) setText(apiRefs.totalBurn, fmt(st.apiBurned), 'apiTotalBurn');
+    if (apiRefs.totalBurn) setText(apiRefs.totalBurn, big(st.apiBurned), 'apiTotalBurn');
     if (apiRefs.dbCount) setText(apiRefs.dbCount, String(st.apiDb.length), 'apiDbCount');
     if (apiRefs.dbTabCount) setText(apiRefs.dbTabCount, String(st.apiDb.length), 'apiDbTabCount');
     if (els.apiFoot) {
@@ -4189,13 +4184,13 @@
         setText(els.shopFoot, note, 'shopFoot');
       }
     } else {
-      setText(els.hint, '代理 ×' + ai + ' · 点击 +' + fmt(root.Sim.clickGain(st)) + ' Token · 自动烧速 ' + auto + '/s', 'hint');
+      setText(els.hint, '代理 ×' + ai + ' · 点击 +' + big(root.Sim.clickGain(st)) + ' Token · 自动烧速 ' + (Num ? Num.rate(auto) : auto + '/s'), 'hint');
       setText(els.chip2, '快递 ' + root.Sim.deliverySec(st) + ' 秒送达', 'chip2');
     }
-    setText(els.chip1, st.act1Done ? '第 ' + root.Sim.chapter(st).num + ' 幕' : '第 1 幕', 'chip1');
+    setText(els.chip1, st.endless ? '无尽运行' : st.act1Done ? '第 ' + root.Sim.chapter(st).num + ' 幕' : '第 1 幕', 'chip1');
     setText(els.tbMem, '内存 ×' + root.Sim.ramMult(st), 'tbMem');
     setText(els.tbProc, '代理 ' + ai, 'tbProc');
-    setText(els.tbBurn, '自动 ' + auto + '/s', 'tbBurn');
+    setText(els.tbBurn, '自动 ' + (Num ? Num.rate(auto) : auto + '/s'), 'tbBurn');
     setText(els.tbMine, '挖矿 ¥' + fmt(mine) + '/s', 'tbMine');
     setText(els.tbToken, st.endless ? '累计消耗 ' + big(st.burned) : '剩余 ' + big(st.token), 'tbToken');
     if (els.tbAi) {

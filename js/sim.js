@@ -1146,6 +1146,18 @@
         byline: '本报编辑部',
       };
     }
+    if (kind === 'endless') {
+      return {
+        deck: '最后一份协议翻到背面，目标那一栏已经空了。',
+        paras: [
+          '百万亿 Token 已经清零。协议中心没有寄来新的合同，只回了一行：目标解除。',
+          '机房不会停机。订单、模型、硬件和账本都留在原位，之后的每一次燃烧只累计，不再结算结局。',
+          '从今天起，计数板只记一件事：这间机房一共替你烧掉了多少 Token。',
+        ],
+        quote: { text: '后面没有目标了，继续烧。', by: '协议中心' },
+        byline: '本报协议版',
+      };
+    }
     if (kind === 'level') {
       const name = data.name || '新模型';
       return {
@@ -2528,15 +2540,18 @@
     };
   }
 
-  /* ---------------- 终局三选一 ---------------- */
+  /* ---------------- 终局 / 续签 / 无尽 ---------------- */
   function endingChoice(st) {
     if (st.endless || st.token > 0 || st.ended) return null;
     st.token = 0;
     st.ended = true;
     st.ending = 'choice';
-    log(st, contractIndex(st) >= 1
-      ? '【' + currentContract(st).def.name + '】Token 已烧尽，合同只能续签。'
-      : '【' + currentContract(st).def.name + '】Token 已烧尽。三选一摆在桌上。');
+    const last = contractIndex(st) === C.CONTRACTS.length - 1;
+    log(st, last
+      ? '【' + currentContract(st).def.name + '】Token 已烧尽。最后一份协议进入终局。'
+      : contractIndex(st) >= 1
+        ? '【' + currentContract(st).def.name + '】Token 已烧尽，合同只能续签。'
+        : '【' + currentContract(st).def.name + '】Token 已烧尽。三选一摆在桌上。');
     return { type: 'ending' };
   }
 
@@ -2544,8 +2559,13 @@
     if (st.ending !== 'choice') return { ok: false, reason: '现在没有要做的选择' };
     const def = C.ENDINGS.find(x => x.id === id);
     if (!def) return { ok: false, reason: '没有这个结局' };
-    if (contractIndex(st) >= 1 && id !== 'sandbox') {
-      return { ok: false, reason: '这份协议只能续签' };
+    const ci = contractIndex(st);
+    const last = ci === C.CONTRACTS.length - 1;
+    if (ci === 1 && id !== 'sandbox') {
+      return { ok: false, reason: '百亿协议只能续签' };
+    }
+    if (last && id !== 'endless') {
+      return { ok: false, reason: '百万亿协议已经结束，只能进入无尽运行' };
     }
     if (id === 'endless') {
       if (nextContract(st)) return { ok: false, reason: '还能续签更大的协议' };
@@ -2554,6 +2574,12 @@
       st.ending = 'endless';
       st.token = 0;
       log(st, '目标已解除，进入无尽运行：之后只累计 Token 消耗。');
+      addNews(st, {
+        cat: 'notice', tag: '终局', tone: 'good', source: '协议中心',
+        title: '协议结束 · 无尽运行',
+        body: '百万亿合同执行完毕。目标解除，机房继续运行，之后只记录累计 Token 消耗。',
+        story: newsStory('endless', { burned: st.burned }),
+      });
       return {
         ok: true, id: id,
         ev: [{ type: 'endingChosen', id: id }, { type: 'endlessStart', burned: st.burned }],
@@ -2561,11 +2587,10 @@
     }
     if (id === 'sandbox') {
       const nc = nextContract(st);
-      const tgt = nc ? nc.def : currentContract(st).def;
-      const index = nc ? nc.index : contractIndex(st);
+      if (!nc) return { ok: false, reason: '最后一份协议没有续签' };
       st.contractBase = st.burned;
-      st.contract = index;
-      st.token = tgt.target;
+      st.contract = nc.index;
+      st.token = nc.def.target;
       st.ended = false;
       st.ending = 'sandbox';
       st.orderBoard = [];
@@ -2576,20 +2601,18 @@
       st.worldNeg = 0;
       st.eventRev = (st.eventRev || 0) + 1;
       seedOrders(st);
-      log(st, '续签：' + tgt.name + ' 已生效，新标的 ' + tgt.target.toLocaleString('en-US') + ' Token。');
+      log(st, '续签：' + nc.def.name + ' 已生效，新标的 ' + nc.def.target.toLocaleString('en-US') + ' Token。');
       addNews(st, {
         cat: 'notice', tag: '公告', tone: 'good', source: '协议中心',
-        title: '续签 · ' + tgt.name,
-        body: nc
-          ? '新标的 ' + tgt.target.toLocaleString('en-US') + ' Token。软件槽 +1，续签天赋点到账。'
-          : '新标的 ' + tgt.target.toLocaleString('en-US') + ' Token。全部进度保留，再跑一轮。',
-        story: newsStory('renew', { def: tgt, repeat: !nc }),
+        title: '续签 · ' + nc.def.name,
+        body: '新标的 ' + nc.def.target.toLocaleString('en-US') + ' Token。软件槽 +1，续签天赋点到账。',
+        story: newsStory('renew', { def: nc.def, repeat: false }),
       });
       return {
-        ok: true, id: id, contract: index,
+        ok: true, id: id, contract: nc.index,
         ev: [{ type: 'endingChosen', id: id }, {
-          type: 'contractRenew', index: index, id: tgt.id,
-          name: tgt.name, short: tgt.short, target: tgt.target,
+          type: 'contractRenew', index: nc.index, id: nc.def.id,
+          name: nc.def.name, short: nc.def.short, target: nc.def.target,
         }],
       };
     }
@@ -2930,7 +2953,7 @@
     normalizeServers(st, s.servers);
     normalizeRig(st, s.rig);
 
-    // 旧沙盒档：token 已归零但还没续签，直接进入下一份协议
+    // 旧续签档：token 已归零但还没续签；有下一份就续签，最后一份则进入无尽
     if (!st.endless && st.ending === 'sandbox' && st.token <= 0) {
       const nc = nextContract(st);
       if (nc) {
@@ -2947,20 +2970,19 @@
         st.eventRev = (st.eventRev || 0) + 1;
         if (st.act1Done) seedOrders(st);
       } else {
-        const con = currentContract(st);
-        st.contractBase = st.burned;
-        st.token = con.def.target;
+        st.endless = true;
         st.ended = false;
-        st.orderBoard = [];
-        st.active = [];
-        st.worldEvent = null;
-        st.worldTimer = C.CONST.worldFirstDelay;
-        st.worldRecent = [];
-        st.worldNeg = 0;
-        st.eventRev = (st.eventRev || 0) + 1;
-        st.ending = 'sandbox';
-        if (st.act1Done) seedOrders(st);
+        st.ending = 'endless';
+        st.token = 0;
+        st.contract = C.CONTRACTS.length - 1;
       }
+    }
+    if (!st.endless && st.contract === C.CONTRACTS.length - 1 && st.token <= 0 &&
+        st.ending === 'choice') {
+      st.endless = true;
+      st.ended = false;
+      st.ending = 'endless';
+      st.token = 0;
     }
 
     // 旧第 2 幕存档：S1 点亮并补套件

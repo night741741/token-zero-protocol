@@ -17,14 +17,7 @@
   const Drag = root.Drag;
   const $ = id => document.getElementById(id);
   const fmt = n => Math.max(0, Math.round(n)).toLocaleString('en-US');
-  const tokenText = n => {
-    if (n >= 1000000000000) return (n / 1000000000000) + ' 万亿';
-    if (n >= 100000000) {
-      const v = n / 100000000;
-      return (Number.isInteger(v) ? v : v.toFixed(1)) + ' 亿';
-    }
-    return fmt(n);
-  };
+  const tokenText = n => root.TokenNum ? root.TokenNum.compact(n) : fmt(n);
   const stageEl = $('stage');
   const camEl = $('cam');
 
@@ -68,11 +61,11 @@
       },
       pc: () => {
         const lines = [
-          '短按：AI 跑一步，烧 ' + fmt(Sim.clickGain(st)) + ' Token',
+          '短按：AI 跑一步，烧 ' + tokenText(Sim.clickGain(st)) + ' Token',
           st.act1Done ? '长按：进桌面接单、写软件' : '长按 600ms：进入电脑桌面',
         ];
         if (Sim.talentOn(st, 'clk', 3)) {
-          lines.push('自动点击：每 ' + C.CONST.autoClickEvery + ' 秒 +' + fmt(Sim.autoClickRate(st)) + ' Token/s');
+          lines.push('自动点击：每 ' + C.CONST.autoClickEvery + ' 秒 +' + tokenText(Sim.autoClickRate(st)) + ' Token/s');
         } else if (Sim.talentLvl(st, 'clk') > 0) {
           lines.push('点击天赋：×' + (Sim.talentLvl(st, 'clk') >= 2 ? 4 : 2));
         }
@@ -669,7 +662,7 @@
       const r = Sim.rigInstall(st, uid, slotKey);
       if (!r.ok) return fail(r.reason);
       Audio.print();
-      Scene.toast('副机装上 ' + r.def.name + ' · 每次点击 +' + fmt(Sim.clickGain(st)) + ' Token');
+      Scene.toast('副机装上 ' + r.def.name + ' · 每次点击 +' + tokenText(Sim.clickGain(st)) + ' Token');
       Rig.render(st);
       UI.sync(st);
     },
@@ -690,7 +683,7 @@
       if (r.pkg.item === 'ram') {
         const mult = C.RAM[r.pkg.tier].mult;
         Audio.levelup();
-        Scene.toast('内存 ×' + mult + ' 插上了 · 点击 +' + fmt(Sim.clickGain(st)) + ' Token');
+        Scene.toast('内存 ×' + mult + ' 插上了 · 点击 +' + tokenText(Sim.clickGain(st)) + ' Token');
         Scene.floatText(1040, 706, '点击 ×' + mult);
       } else if (r.pkg.item === 'hw') {
         Audio.print();
@@ -742,49 +735,63 @@
     if (st.ending === 'choice') {
       const cp = Sim.contractProgress(st);
       const next = cp.next;
+      const last = !next && cp.index === C.CONTRACTS.length - 1;
       const forced = cp.index >= 1;
-      tag.textContent = cp.def.name + ' · ' + tokenText(cp.target) + ' / ' + tokenText(cp.target);
-      title.textContent = cp.def.short + ' Token 已烧尽';
-      text.textContent = forced
-        ? '合同烧完了，桌上只剩一份续签协议，没有别的路。'
-        : '它把最后一份算力用完，停下来等你决定接下来怎么办。';
+      tag.textContent = last
+        ? cp.def.name + ' · 协议完成'
+        : cp.def.name + ' · ' + tokenText(cp.target) + ' / ' + tokenText(cp.target);
+      title.textContent = last
+        ? '百万亿 Token 已清零'
+        : cp.def.short + ' Token 已烧尽';
+      text.textContent = last
+        ? '最后一份协议没有续签页。它把笔收回，屏幕上的目标消失。接下来只记录你累计烧掉了多少 Token。'
+        : forced
+          ? '合同烧完了，桌上只剩一份续签协议，没有别的路。'
+          : '它把最后一份算力用完，停下来等你决定接下来怎么办。';
       const ac = choices ? choices.querySelector('[data-id="ascend"]') : null;
       const co = choices ? choices.querySelector('[data-id="coexist"]') : null;
       if (ac) ac.classList.toggle('hidden', forced);
       if (co) co.classList.toggle('hidden', forced);
       const sb = choices ? choices.querySelector('[data-id="sandbox"]') : null;
       if (sb) {
-        sb.classList.remove('hidden');
-        const sub = sb.querySelector('b');
-        const nm = sb.querySelector('span');
-        const tx = sb.querySelector('em');
-        if (sub && nm && tx) {
-          if (next) {
+        sb.classList.toggle('hidden', last);
+        if (!last && next) {
+          const sub = sb.querySelector('b');
+          const nm = sb.querySelector('span');
+          const tx = sb.querySelector('em');
+          if (sub && nm && tx) {
             sub.textContent = '续签 · ' + next.def.short;
             nm.textContent = '签下' + next.def.name;
             tx.textContent = '额度重置为 ' + tokenText(next.def.target) +
-              ' Token，硬件、模型、资金与数据库全部保留。';
-          } else {
-            sub.textContent = '续签 · ' + cp.def.short;
-            nm.textContent = '再签' + cp.def.name;
-            tx.textContent = '额度重置为 ' + tokenText(cp.def.target) +
               ' Token，硬件、模型、资金与数据库全部保留。';
           }
         }
       }
       const eb = choices ? choices.querySelector('[data-id="endless"]') : null;
-      if (eb) eb.classList.toggle('hidden', forced || !!next);
+      if (eb) {
+        eb.classList.toggle('hidden', !last);
+        if (last) {
+          const sub = eb.querySelector('b');
+          const nm = eb.querySelector('span');
+          const tx = eb.querySelector('em');
+          if (sub && nm && tx) {
+            sub.textContent = '无尽运行';
+            nm.textContent = '进入无尽运行';
+            tx.textContent = '目标解除，全部进度保留。之后不再结算结局，只累计 Token 消耗。';
+          }
+        }
+      }
       if (choices) {
         choices.classList.remove('hidden');
         choices.classList.toggle('solo', forced);
       }
       if (foot) {
         foot.classList.remove('hidden');
-        foot.textContent = forced
-          ? (next
+        foot.textContent = last
+          ? '百万亿之后没有续签 · 只记录累计消耗'
+          : forced
             ? '这份协议只能续签 · 签下' + next.def.short + '，没有重新开始'
-            : '这份协议只能续签 · 再跑一轮' + cp.def.short + '，没有重新开始')
-          : '三个选择都通往结局 · 续签会进入更大的标的';
+            : '三个选择都通往结局 · 续签会进入更大的标的';
       }
       if (restart) restart.classList.add('hidden');
     } else {

@@ -5,6 +5,7 @@
 (function (root) {
   'use strict';
   const C = root.CONTENT;
+  const Num = root.TokenNum;
   const $ = id => document.getElementById(id);
 
   let st = null, api = null;
@@ -16,21 +17,7 @@
 
   const fmt = n => Math.max(0, Math.round(n)).toLocaleString('en-US');
   const wan = n => (n >= 10000 ? (n / 10000) + ' 万' : String(n));
-  const tokenLabel = n => {
-    if (n >= 1000000000000) {
-      const v = n / 1000000000000;
-      return (Number.isInteger(v) ? v : v.toFixed(1)) + ' 万亿';
-    }
-    if (n >= 100000000) {
-      const v = n / 100000000;
-      return (Number.isInteger(v) ? v : v.toFixed(1)) + ' 亿';
-    }
-    if (n >= 10000) {
-      const v = n / 10000;
-      return (Number.isInteger(v) ? v : v.toFixed(1)) + ' 万';
-    }
-    return fmt(n);
-  };
+  const tokenLabel = n => Num ? Num.compact(n) : fmt(n);
   const dataLabel = n => {
     if (n >= 1000000000000) return (n / 1000000000000).toFixed(1) + ' 万亿 GB';
     if (n >= 100000000) return (n / 100000000).toFixed(1) + ' 亿 GB';
@@ -46,14 +33,7 @@
   const RATE_WINDOW = 1000;
   const rate = { state: null, last: 0, samples: [], value: 0 };
 
-  const rateLabel = n => {
-    if (!(n > 0)) return '0/s';
-    if (n >= 1000000000000) return (Math.round(n / 100000000000) / 10) + ' 万亿/s';
-    if (n >= 100000000) return (Math.round(n / 10000000) / 10) + ' 亿/s';
-    if (n >= 10000) return (Math.round(n / 1000) / 10) + ' 万/s';
-    if (n >= 100) return Math.round(n).toLocaleString('en-US') + '/s';
-    return (Math.round(n * 10) / 10) + '/s';
-  };
+  const rateLabel = n => Num ? Num.rate(n) : (n > 0 ? Math.round(n) + '/s' : '0/s');
 
   function trackBurn(state, now) {
     if (!state) return;
@@ -158,33 +138,35 @@
     setText(el.talent, 'talent', root.Sim.talentPoints(st) + ' / ' + root.Sim.talentTotal(st));
     const ch = root.Sim.chapter(st);
     const actName = ch.endless
-      ? '终局之后 · 无尽运行'
+      ? '累计消耗 ' + tokenLabel(st.burned)
       : '第 ' + ch.num + ' 幕 · ' + ch.def.name;
+    const actStage = ch.endless ? '无尽运行 · 目标解除' : actName;
     setText(el.act, 'act', actName);
     if (el.actProgress) {
       const span = Math.max(1, ch.end - ch.start);
       el.actProgress.classList.remove('hidden');
       el.actProgress.classList.toggle('gate', ch.gate);
-      el.actProgress.setAttribute('aria-label', actName + ' Token 进度');
-      el.actProgress.setAttribute('aria-valuemax', String(span));
+      el.actProgress.classList.toggle('endless', !!ch.endless);
+      el.actProgress.setAttribute('aria-label', ch.endless ? '累计 Token 消耗' : actName + ' Token 进度');
+      el.actProgress.setAttribute('aria-valuemax', String(ch.endless ? 0 : span));
       el.actProgress.setAttribute('aria-valuenow', String(ch.endless
-        ? span
+        ? 0
         : Math.max(0, Math.floor(st.burned - ch.start))));
       el.actProgress.setAttribute('aria-valuetext', ch.endless
         ? '累计消耗 ' + tokenLabel(st.burned)
         : Math.round(ch.pct * 100) + '%');
     }
     const actBurned = Math.max(0, Math.min(ch.end - ch.start, st.burned - ch.start));
-    const actPct = ch.pct * 100;
+    const actPct = ch.endless ? 0 : ch.pct * 100;
     const gpuStage = ch.gate && !ch.endless ? root.Sim.gpuState(st) : '';
     const gateGoal = gpuStage === 'shelf'
       ? '目标达成 · RTX 3060 已到快递架，拆箱解锁'
       : gpuStage === 'transit'
         ? '目标达成 · RTX 3060 正在路上，到货后拆箱'
         : '目标达成 · 去商店买 RTX 3060 并拆箱';
-    setText(el.actNext, 'actNext', actName);
+    setText(el.actNext, 'actNext', actStage);
     setText(el.actGoal, 'actGoal', ch.endless
-      ? '目标已解除 · 持续累计 Token 消耗'
+      ? '目标已解除 · 只记录累计 Token 消耗'
       : ch.gate ? gateGoal : '目标：' + ch.def.goal);
     const nextGift = C.GIFTS.find(g => !g.rescue && (st.gifts || []).indexOf(g.id) === -1);
     setText(el.actGift, 'actGift', nextGift
@@ -211,8 +193,8 @@
     setText(el.jTitle, 'jTitle', ch.endless ? '清零手记 · 无尽运行' : '清零手记 · 第 ' + ch.num + ' 幕');
 
     const line1 = ch.endless
-      ? '累计消耗 ' + fmt(st.burned) + ' Token。<br>目标已解除。'
-      : '已烧 ' + fmt(st.burned) + ' Token，<br>还剩 ' + fmt(st.token) + '。';
+      ? '累计消耗 ' + tokenLabel(st.burned) + ' Token。<br>目标已解除。'
+      : '已烧 ' + tokenLabel(st.burned) + ' Token，<br>还剩 ' + tokenLabel(st.token) + '。';
     setHtml(el.j1, 'j1', line1);
     const recent = st.logs.length ? st.logs[0].msg : '';
     const line2 = recent ? (recent.length > 28 ? recent.slice(0, 27) + '…' : recent) : '先点电脑，<br>让它跑起来。';
@@ -461,7 +443,7 @@
 
   function setPcTerm() {
     if (!root.Scene) return;
-    root.Scene.setPcTerm('&gt; AI 烧掉 ' + fmt(st.burned) + '<i>_</i>');
+    root.Scene.setPcTerm('&gt; AI 烧掉 ' + tokenLabel(st.burned) + '<i>_</i>');
   }
 
   root.UI = { init, sync, trackBurn, renderJournal, syncTalent, setPcTerm };

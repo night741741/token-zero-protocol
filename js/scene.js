@@ -6,6 +6,7 @@
   'use strict';
 
   const TOTAL = 100000000;
+  const Num = root.TokenNum;
   const $ = id => document.getElementById(id);
 
   const LIGHTS = {
@@ -55,13 +56,12 @@
   let remaining = TOTAL;
   let lastRemaining = null;
   let counterEndless = false;
+  let lastConsumedFlip = 0;
 
   function fmt(n) { return Math.max(0, Math.round(n)).toLocaleString('en-US'); }
 
   function bigLabel(n) {
-    if (n >= 1000000000000) return (Math.round(n / 1000000000000 * 100) / 100) + ' 万亿';
-    if (n > 100000000) return (Math.round(n / 100000000 * 100) / 100) + ' 亿';
-    return fmt(n);
+    return Num ? Num.compact(n) : fmt(n);
   }
 
   function counterPattern(target) {
@@ -92,10 +92,7 @@
   }
 
   function consumedPattern(n) {
-    if (n < TOTAL) return fmt(n);
-    const unit = n >= 1000000000000 ? 1000000000000 : 100000000;
-    const suffix = n >= 1000000000000 ? ' 万亿' : ' 亿';
-    return (n / unit).toFixed(4) + suffix;
+    return Num ? Num.flip(n) : fmt(n);
   }
 
   function setCounterMode(endless) {
@@ -156,7 +153,7 @@
     }
     writeFlip(s, doFlip);
     $('pfill').style.width = (burned / total * 100).toFixed(4) + '%';
-    $('burnedTxt').textContent = '已烧 ' + fmt(burned);
+    $('burnedTxt').textContent = '已烧 ' + bigLabel(burned);
     $('pctTxt').textContent = '清零 ' + (burned / total * 100).toFixed(4) + '%';
   }
 
@@ -167,10 +164,13 @@
     lastRemaining = value;
     const s = consumedPattern(value);
     if (s.length !== cells.length) buildFlipText(s);
-    writeFlip(s, doFlip);
+    const now = performance.now();
+    const animate = !!doFlip && now - lastConsumedFlip >= 280;
+    if (animate) lastConsumedFlip = now;
+    writeFlip(s, animate);
     $('pfill').style.width = '100%';
-    $('pctTxt').textContent = '无尽运行';
-    $('burnedTxt').textContent = '累计消耗 ' + fmt(value);
+    $('pctTxt').textContent = '累计运行';
+    $('burnedTxt').textContent = '累计消耗 ' + bigLabel(value);
     $('targetTxt').textContent = '目标已解除';
   }
 
